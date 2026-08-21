@@ -3,10 +3,11 @@ import { DndContext, DragOverlay, type DragEndEvent, type DragStartEvent } from 
 import { employees, shifts } from './lib/data';
 import type { Assignments } from './lib/types';
 import { computeCompliance } from './lib/compliance';
-import { TopBar } from './components/TopBar';
+import { TopBar, type ViewMode } from './components/TopBar';
 import { Sidebar } from './components/Sidebar';
 import { Board } from './components/Board';
 import { EmployeeChip } from './components/EmployeeChip';
+import { FacilitiesBoard } from './components/facilities/FacilitiesBoard';
 
 const shiftsById = new Map(shifts.map((s) => [s.id, s]));
 const employeesById = new Map(employees.map((e) => [e.id, e]));
@@ -16,6 +17,7 @@ const initialAssignments: Assignments = {};
 export default function App() {
   const [assignments, setAssignments] = useState<Assignments>(initialAssignments);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [view, setView] = useState<ViewMode>('roster');
 
   const compliance = useMemo(() => computeCompliance(shifts, assignments, employees), [assignments]);
 
@@ -111,22 +113,28 @@ export default function App() {
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex h-screen flex-col bg-[var(--ink)]">
         <TopBar
+          view={view}
+          onViewChange={setView}
           coveragePct={coveragePct}
           breachCount={breachCount}
           warningCount={warningCount}
           onReset={() => setAssignments({})}
         />
-        <div className="flex min-h-0 flex-1">
-          <Sidebar employees={employees} assignedCounts={assignedCounts} />
-          <div className="min-w-0 flex-1 overflow-auto">
-            <Board
-              assignments={assignments}
-              employeesById={employeesById}
-              compliance={compliance}
-              onRemove={handleRemove}
-            />
+        {view === 'roster' ? (
+          <div className="flex min-h-0 flex-1">
+            <Sidebar employees={employees} assignedCounts={assignedCounts} />
+            <div className="min-w-0 flex-1 overflow-auto">
+              <Board
+                assignments={assignments}
+                employeesById={employeesById}
+                compliance={compliance}
+                onRemove={handleRemove}
+              />
+            </div>
           </div>
-        </div>
+        ) : (
+          <FacilitiesBoard />
+        )}
       </div>
       <DragOverlay>{draggingEmployee ? <EmployeeChip employee={draggingEmployee} /> : null}</DragOverlay>
     </DndContext>

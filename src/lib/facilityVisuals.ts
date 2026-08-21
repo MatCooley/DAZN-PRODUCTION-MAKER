@@ -1,0 +1,29 @@
+import type { FacilityEventType } from './facilityTypes';
+
+export const PX_PER_HOUR = 34;
+export const ROW_HEIGHT = 52;
+export const SNAP_HOURS = 0.25; // 15 minutes
+
+// Per the spec's visual-language table:
+// yellow = confirmed booking, red = conflict, green outline = available,
+// grey = unavailable/blocked (hold/maintenance/blackout).
+export const facilityEventStyle: Record<
+  FacilityEventType,
+  { fill: string; border: string; textColor: string }
+> = {
+  BOOKING: { fill: '#E8A93C', border: '#E8A93C', textColor: '#1a1508' },
+  HOLD: { fill: '#8b98a555', border: '#8B98A5', textColor: '#E7ECEF' },
+  MAINTENANCE: { fill: '#4a5560', border: '#6b7784', textColor: '#E7ECEF' },
+  BLACKOUT: { fill: '#2a2f36', border: '#4a5560', textColor: '#8B98A5' },
+  AVAILABILITY_WINDOW: { fill: 'transparent', border: '#3FBF7F', textColor: '#3FBF7F' },
+};
+
+export const conflictStyle = { fill: '#E1543D33', border: '#E1543D', textColor: '#ffe4de' };
+
+export const facilityEventLabel: Record<FacilityEventType, string> = {
+  BOOKING: 'Booking',
+  HOLD: 'Hold',
+  MAINTENANCE: 'Maintenance',
+  BLACKOUT: 'Blackout',
+  AVAILABILITY_WINDOW: 'Available',
+};
