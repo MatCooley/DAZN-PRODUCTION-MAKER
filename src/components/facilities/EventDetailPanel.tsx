@@ -1,5 +1,5 @@
-import { X } from 'lucide-react';
-import type { FacilityEvent } from '../../lib/facilityTypes';
+import { X, Link2, Repeat, Users } from 'lucide-react';
+import type { ChangeRequest, FacilityEvent } from '../../lib/facilityTypes';
 import { facilityEventLabel, facilityEventStyle } from '../../lib/facilityVisuals';
 
 function fmt(iso: string) {
@@ -18,11 +18,13 @@ export function EventDetailPanel({
   event,
   resourceName,
   conflicts,
+  pendingRequest,
   onClose,
 }: {
   event: FacilityEvent;
   resourceName: string;
   conflicts: FacilityEvent[];
+  pendingRequest?: ChangeRequest;
   onClose: () => void;
 }) {
   const style = facilityEventStyle[event.eventType];
@@ -55,6 +57,27 @@ export function EventDetailPanel({
         <Row label="Event ID" value={event.id} mono />
       </dl>
 
+      {(event.linkedBookingSetId || event.seriesId || event.bookingGroupId) && (
+        <div className="mt-2.5 space-y-1 border-t border-[var(--line)] pt-2.5">
+          {event.linkedBookingSetId && (
+            <p className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-muted)]">
+              <Link2 size={11} className="text-[var(--tally)]" /> Linked — moves together with its coupled resource
+            </p>
+          )}
+          {event.seriesId && (
+            <p className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-muted)]">
+              <Repeat size={11} className="text-[var(--tally)]" />
+              Part of a recurring series{event.isModifiedOccurrence ? ' — diverged from template' : ''}
+            </p>
+          )}
+          {event.bookingGroupId && (
+            <p className="flex items-center gap-1.5 text-[10.5px] text-[var(--text-muted)]">
+              <Users size={11} className="text-[var(--tally)]" /> Shares this shift with another client/production code
+            </p>
+          )}
+        </div>
+      )}
+
       {conflicts.length > 0 && (
         <div className="mt-3 rounded-md border border-[var(--signal-red)]/40 bg-[var(--signal-red)]/10 p-2">
           <p className="mb-1 font-mono text-[9.5px] uppercase tracking-wide text-[var(--signal-red)]">
@@ -65,6 +88,18 @@ export function EventDetailPanel({
               {c.title ?? c.eventType} · {fmt(c.start)}
             </p>
           ))}
+        </div>
+      )}
+
+      {pendingRequest && (
+        <div className="mt-3 rounded-md border border-[var(--signal-amber)]/40 bg-[var(--signal-amber)]/10 p-2">
+          <p className="mb-1 font-mono text-[9.5px] uppercase tracking-wide text-[var(--signal-amber)]">
+            Pending change request
+          </p>
+          <p className="text-[11px] text-[var(--text-primary)]">Proposed start: {fmt(pendingRequest.proposedStart)}</p>
+          {pendingRequest.reason && (
+            <p className="mt-0.5 text-[10.5px] italic text-[var(--text-muted)]">"{pendingRequest.reason}"</p>
+          )}
         </div>
       )}
     </div>

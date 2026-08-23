@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { Link2, Repeat, Users } from 'lucide-react';
 import type { FacilityEvent } from '../../lib/facilityTypes';
 import { PX_PER_HOUR, SNAP_HOURS, conflictStyle, facilityEventStyle } from '../../lib/facilityVisuals';
 
@@ -11,7 +12,7 @@ export function EventBlock({
   widthPx,
   hasConflict,
   checkValid,
-  onCommit,
+  onDrop,
   onClick,
 }: {
   event: FacilityEvent;
@@ -19,7 +20,7 @@ export function EventBlock({
   widthPx: number;
   hasConflict: boolean;
   checkValid: (start: Date, end: Date) => boolean;
-  onCommit: (id: string, start: Date, end: Date) => void;
+  onDrop: (id: string, start: Date, end: Date, valid: boolean) => void;
   onClick: (event: FacilityEvent) => void;
 }) {
   const [drag, setDrag] = useState<{ deltaPx: number; valid: boolean } | null>(null);
@@ -61,8 +62,8 @@ export function EventBlock({
       const newStart = new Date(origStart.getTime() + snapped * 3_600_000);
       const newEnd = new Date(origEnd.getTime() + snapped * 3_600_000);
 
-      if (snapped !== 0 && checkValid(newStart, newEnd)) {
-        onCommit(event.id, newStart, newEnd);
+      if (snapped !== 0) {
+        onDrop(event.id, newStart, newEnd, checkValid(newStart, newEnd));
       }
       setDrag(null);
     }
@@ -74,8 +75,8 @@ export function EventBlock({
   const style = facilityEventStyle[event.eventType];
   const showConflict = hasConflict && !drag;
   const dragInvalid = drag && !drag.valid;
-
   const isAvailability = event.eventType === 'AVAILABILITY_WINDOW';
+  const badgeCount = [event.linkedBookingSetId, event.seriesId, event.bookingGroupId].filter(Boolean).length;
 
   return (
     <div
@@ -84,7 +85,7 @@ export function EventBlock({
         if (isAvailability) onClick(event);
         e.stopPropagation();
       }}
-      className={`absolute top-1.5 flex items-center overflow-hidden rounded-[4px] border px-1.5 transition-shadow
+      className={`absolute top-1.5 flex items-center gap-1 overflow-hidden rounded-[4px] border px-1.5 transition-shadow
         ${draggable ? 'cursor-grab active:cursor-grabbing' : isAvailability ? 'cursor-pointer' : 'cursor-default'}
         ${drag ? 'z-20 shadow-lg' : 'z-0'}`}
       style={{
@@ -99,6 +100,13 @@ export function EventBlock({
       }}
       title={`${event.title ?? event.eventType} — ${event.start.slice(11, 16)}–${event.end.slice(11, 16)}`}
     >
+      {badgeCount > 0 && (
+        <span className="flex shrink-0 items-center gap-0.5 opacity-80">
+          {event.linkedBookingSetId && <Link2 size={9} />}
+          {event.seriesId && <Repeat size={9} />}
+          {event.bookingGroupId && <Users size={9} />}
+        </span>
+      )}
       <span
         className="truncate font-mono text-[10px] font-medium leading-none"
         style={{ color: showConflict ? conflictStyle.textColor : style.textColor }}

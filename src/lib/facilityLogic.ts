@@ -21,6 +21,11 @@ export function computeConflicts(events: FacilityEvent[]): ConflictMap {
       for (let j = i + 1; j < onResource.length; j++) {
         const a = onResource[i];
         const b = onResource[j];
+        // Pairs sharing a bookingGroupId are an intentional, allowed
+        // overlap (different client/production codes within one
+        // shift's occupancy) — skip, mirroring v_resource_conflicts.
+        const sameGroup = a.bookingGroupId && b.bookingGroupId && a.bookingGroupId === b.bookingGroupId;
+        if (sameGroup) continue;
         if (overlaps(new Date(a.start), new Date(a.end), new Date(b.start), new Date(b.end))) {
           (map[a.id] ??= []).push(b.id);
           (map[b.id] ??= []).push(a.id);

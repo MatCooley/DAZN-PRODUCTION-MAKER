@@ -27,27 +27,40 @@ export const resourceDependencies: ResourceDependency[] = [
 let seq = 0;
 const id = () => `fe-${++seq}`;
 
+const breakfastSeriesId = 'series-breakfast-a';
+const bTuesdayNightGroupId = 'grp-thu-night-cr';
+const studioALinkSetMon = 'link-a-mon';
+const studioALinkSetTue = 'link-a-tue';
+const studioALinkSetWed = 'link-a-wed';
+
 export const initialFacilityEvents: FacilityEvent[] = [
-  // Studio A — Control Room
-  { id: id(), resourceId: 'r-a-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-24T05:30:00', end: '2026-08-24T13:30:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast' },
+  // Studio A — Control Room (recurring "Breakfast Sport" series — daily 06:00-ish)
+  { id: id(), resourceId: 'r-a-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-24T05:30:00', end: '2026-08-24T13:30:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast', seriesId: breakfastSeriesId, isModifiedOccurrence: false },
   { id: id(), resourceId: 'r-a-cr', eventType: 'AVAILABILITY_WINDOW', isBlocking: false, start: '2026-08-24T13:30:00', end: '2026-08-24T20:00:00', status: 'CONFIRMED' },
-  { id: id(), resourceId: 'r-a-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-25T05:30:00', end: '2026-08-25T13:30:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast' },
+  { id: id(), resourceId: 'r-a-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-25T05:30:00', end: '2026-08-25T13:30:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast', seriesId: breakfastSeriesId, isModifiedOccurrence: false },
   { id: id(), resourceId: 'r-a-cr', eventType: 'MAINTENANCE', isBlocking: true, start: '2026-08-25T14:00:00', end: '2026-08-25T16:00:00', status: 'CONFIRMED', title: 'Vision desk firmware update' },
-  { id: id(), resourceId: 'r-a-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-26T06:00:00', end: '2026-08-26T14:00:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast' },
-  { id: id(), resourceId: 'r-a-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-27T06:00:00', end: '2026-08-27T14:00:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast' },
-  { id: id(), resourceId: 'r-a-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-28T06:00:00', end: '2026-08-28T14:00:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast' },
+  { id: id(), resourceId: 'r-a-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-26T06:00:00', end: '2026-08-26T14:00:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast', seriesId: breakfastSeriesId, isModifiedOccurrence: false },
+  { id: id(), resourceId: 'r-a-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-27T06:00:00', end: '2026-08-27T14:00:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast', seriesId: breakfastSeriesId, isModifiedOccurrence: false },
+  { id: id(), resourceId: 'r-a-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-28T06:00:00', end: '2026-08-28T14:00:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast', seriesId: breakfastSeriesId, isModifiedOccurrence: false },
   { id: id(), resourceId: 'r-a-cr', eventType: 'AVAILABILITY_WINDOW', isBlocking: false, start: '2026-08-29T00:00:00', end: '2026-08-31T00:00:00', status: 'CONFIRMED' },
 
-  // Studio A — Floor (coupled to CR)
-  { id: id(), resourceId: 'r-a-fl', eventType: 'BOOKING', isBlocking: true, start: '2026-08-24T05:30:00', end: '2026-08-24T13:30:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast' },
-  { id: id(), resourceId: 'r-a-fl', eventType: 'BOOKING', isBlocking: true, start: '2026-08-25T05:30:00', end: '2026-08-25T13:30:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast' },
-  { id: id(), resourceId: 'r-a-fl', eventType: 'BOOKING', isBlocking: true, start: '2026-08-26T06:00:00', end: '2026-08-26T14:00:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast' },
+  // Studio A — Floor (coupled to CR — same-time bookings share a linkedBookingSetId
+  // so dragging either moves both, per the confirmed CR/Floor linking requirement)
+  { id: id(), resourceId: 'r-a-fl', eventType: 'BOOKING', isBlocking: true, start: '2026-08-24T05:30:00', end: '2026-08-24T13:30:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast', linkedBookingSetId: studioALinkSetMon },
+  { id: id(), resourceId: 'r-a-fl', eventType: 'BOOKING', isBlocking: true, start: '2026-08-25T05:30:00', end: '2026-08-25T13:30:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast', linkedBookingSetId: studioALinkSetTue },
+  { id: id(), resourceId: 'r-a-fl', eventType: 'BOOKING', isBlocking: true, start: '2026-08-26T06:00:00', end: '2026-08-26T14:00:00', status: 'CONFIRMED', title: 'Breakfast Sport', production: 'Studio A Breakfast', linkedBookingSetId: studioALinkSetWed },
+
+  // Tag the matching Monday/Tuesday/Wednesday CR bookings with the same link sets
+  // (done via a second pass below, since the array above is declared in order).
 
   // Studio B — Control Room (Thursday night live + Sunday live)
   { id: id(), resourceId: 'r-b-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-24T09:00:00', end: '2026-08-24T17:00:00', status: 'CONFIRMED', title: 'Highlights Desk', production: 'Studio B Desk' },
   { id: id(), resourceId: 'r-b-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-25T09:00:00', end: '2026-08-25T17:00:00', status: 'CONFIRMED', title: 'Highlights Desk', production: 'Studio B Desk' },
   { id: id(), resourceId: 'r-b-cr', eventType: 'HOLD', isBlocking: true, start: '2026-08-27T10:00:00', end: '2026-08-27T17:00:00', status: 'HELD', title: 'NRL bump-in (tentative)' },
-  { id: id(), resourceId: 'r-b-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-27T17:00:00', end: '2026-08-28T01:00:00', status: 'CONFIRMED', title: 'NRL — Thu Night Live', production: 'NRL Thursday' },
+  // Deliberately overlapping pair sharing a booking_group_id: one shift,
+  // two client billing codes — allowed overlap, not a conflict.
+  { id: id(), resourceId: 'r-b-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-27T17:00:00', end: '2026-08-28T01:00:00', status: 'CONFIRMED', title: 'NRL — Thu Night Live', production: 'NRL Thursday', client: 'NRL broadcast code', bookingGroupId: bTuesdayNightGroupId },
+  { id: id(), resourceId: 'r-b-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-27T17:00:00', end: '2026-08-28T01:00:00', status: 'CONFIRMED', title: 'NRL — Sponsor Feed', production: 'NRL Thursday', client: 'Sponsor feed code', bookingGroupId: bTuesdayNightGroupId },
   { id: id(), resourceId: 'r-b-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-30T09:30:00', end: '2026-08-30T17:30:00', status: 'CONFIRMED', title: 'NRL — Sun Afternoon Live', production: 'NRL Sunday' },
   { id: id(), resourceId: 'r-b-cr', eventType: 'AVAILABILITY_WINDOW', isBlocking: false, start: '2026-08-24T17:00:00', end: '2026-08-25T09:00:00', status: 'CONFIRMED' },
 
@@ -55,10 +68,18 @@ export const initialFacilityEvents: FacilityEvent[] = [
   { id: id(), resourceId: 'r-b-fl', eventType: 'BOOKING', isBlocking: true, start: '2026-08-24T09:00:00', end: '2026-08-24T17:00:00', status: 'CONFIRMED', title: 'Highlights Desk', production: 'Studio B Desk' },
   { id: id(), resourceId: 'r-b-fl', eventType: 'BOOKING', isBlocking: true, start: '2026-08-27T17:00:00', end: '2026-08-28T01:00:00', status: 'CONFIRMED', title: 'NRL — Thu Night Live', production: 'NRL Thursday' },
 
-  // Studio C — Control Room (boxing main card + a deliberate overlap to show a conflict)
+  // Studio C — Control Room (boxing main card + a deliberate genuine conflict)
   { id: id(), resourceId: 'r-c-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-29T11:00:00', end: '2026-08-29T19:00:00', status: 'CONFIRMED', title: 'Boxing — Fight Week Build', production: 'Boxing Sydney' },
   { id: id(), resourceId: 'r-c-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-29T19:00:00', end: '2026-08-30T03:00:00', status: 'CONFIRMED', title: 'Boxing — Main Card Live', production: 'Boxing Sydney' },
   { id: id(), resourceId: 'r-c-cr', eventType: 'BLACKOUT', isBlocking: true, start: '2026-08-26T00:00:00', end: '2026-08-26T08:00:00', status: 'CONFIRMED', title: 'Power infrastructure works' },
   // Deliberate overlap for demo purposes: a booking that clashes with the blackout above
   { id: id(), resourceId: 'r-c-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-26T06:00:00', end: '2026-08-26T10:00:00', status: 'CONFIRMED', title: 'Early promo shoot', production: 'Boxing Promo' },
 ];
+
+// Link the Studio A CR breakfast bookings to their Floor counterparts above.
+const [monCR, tueCR, wedCR] = initialFacilityEvents.filter(
+  (e) => e.resourceId === 'r-a-cr' && e.eventType === 'BOOKING'
+);
+if (monCR) monCR.linkedBookingSetId = studioALinkSetMon;
+if (tueCR) tueCR.linkedBookingSetId = studioALinkSetTue;
+if (wedCR) wedCR.linkedBookingSetId = studioALinkSetWed;

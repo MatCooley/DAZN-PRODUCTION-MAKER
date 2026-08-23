@@ -16,14 +16,14 @@ export function ResourceRow({
   events,
   conflictIds,
   checkValid,
-  onCommit,
+  onDrop,
   onClickEvent,
 }: {
   resource: Resource;
   events: FacilityEvent[];
   conflictIds: Set<string>;
   checkValid: (event: FacilityEvent, start: Date, end: Date) => boolean;
-  onCommit: (id: string, start: Date, end: Date) => void;
+  onDrop: (id: string, start: Date, end: Date, valid: boolean) => void;
   onClickEvent: (event: FacilityEvent) => void;
 }) {
   return (
@@ -50,7 +50,7 @@ export function ResourceRow({
             widthPx={pxFor(ev.end) - pxFor(ev.start)}
             hasConflict={conflictIds.has(ev.id)}
             checkValid={(start, end) => checkValid(ev, start, end)}
-            onCommit={onCommit}
+            onDrop={onDrop}
             onClick={onClickEvent}
           />
         ))}
