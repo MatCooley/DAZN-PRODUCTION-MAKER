@@ -2,6 +2,7 @@ import { X, Link2, Repeat, Users } from 'lucide-react';
 import type { ChangeRequest, FacilityEvent } from '../../lib/facilityTypes';
 import { facilityEventLabel, facilityEventStyle } from '../../lib/facilityVisuals';
 import { showLibrary } from '../../lib/showLibrary';
+import { toLocalDateString } from '../../lib/dateUtils';
 
 function fmt(iso: string) {
   const d = new Date(iso);
@@ -54,6 +55,9 @@ export function EventDetailPanel({
         <Row label="Resource" value={resourceName} />
         <Row label="Start" value={fmt(event.start)} mono />
         <Row label="End" value={fmt(event.end)} mono />
+        {toLocalDateString(new Date(event.start)) !== toLocalDateString(new Date(event.end)) && (
+          <p className="text-[10px] italic text-[var(--tally)]">Spans past midnight into the next day</p>
+        )}
         <Row label="Status" value={event.status} />
         {event.production && <Row label="Production" value={event.production} />}
         {event.client && <Row label="Client" value={event.client} />}

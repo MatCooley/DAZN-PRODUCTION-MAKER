@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
-import { Link2, Repeat, Users } from 'lucide-react';
+import { Link2, Repeat, Users, MoveRight } from 'lucide-react';
 import type { FacilityEvent } from '../../lib/facilityTypes';
+import { toLocalDateString } from '../../lib/dateUtils';
 import { SNAP_HOURS, conflictStyle, facilityEventStyle } from '../../lib/facilityVisuals';
 
 const DRAGGABLE_TYPES = new Set(['BOOKING', 'HOLD', 'MAINTENANCE', 'BLACKOUT']);
@@ -79,6 +80,7 @@ export function EventBlock({
   const dragInvalid = drag && !drag.valid;
   const isAvailability = event.eventType === 'AVAILABILITY_WINDOW';
   const badgeCount = [event.linkedBookingSetId, event.seriesId, event.bookingGroupId].filter(Boolean).length;
+  const crossesMidnight = toLocalDateString(new Date(event.start)) !== toLocalDateString(new Date(event.end));
 
   return (
     <div
@@ -100,7 +102,7 @@ export function EventBlock({
         borderWidth: dragInvalid ? 2 : 1,
         opacity: isAvailability ? 0.7 : 1,
       }}
-      title={`${event.title ?? event.eventType} — ${event.start.slice(11, 16)}–${event.end.slice(11, 16)}`}
+      title={`${event.title ?? event.eventType} — ${event.start.slice(11, 16)}–${event.end.slice(11, 16)}${crossesMidnight ? ' (continues into the next day)' : ''}`}
     >
       {badgeCount > 0 && (
         <span className="flex shrink-0 items-center gap-0.5 opacity-80">
@@ -115,6 +117,13 @@ export function EventBlock({
       >
         {event.title ?? (isAvailability ? 'Available' : event.eventType)}
       </span>
+      {crossesMidnight && widthPx > 20 && (
+        <MoveRight
+          size={10}
+          className="ml-auto shrink-0 opacity-70"
+          style={{ color: showConflict ? conflictStyle.textColor : style.textColor }}
+        />
+      )}
     </div>
   );
 }
