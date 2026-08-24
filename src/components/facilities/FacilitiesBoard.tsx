@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, CalendarClock } from 'lucide-react';
 import { resources, initialFacilityEvents, weekOf, weekStartISO } from '../../lib/facilityData';
 import type { ChangeRequest, FacilityEvent, SimUser } from '../../lib/facilityTypes';
@@ -22,6 +22,7 @@ import { RoleSwitcher } from './RoleSwitcher';
 import { NotificationBell } from './NotificationBell';
 import { ShowMakerWizard, type BookingDraft } from './ShowMakerWizard';
 import { statusColor } from '../../lib/visuals';
+import { DEFAULT_PX_PER_HOUR, MIN_PX_PER_HOUR, MAX_PX_PER_HOUR } from '../../lib/facilityVisuals';
 
 let reqSeq = 0;
 const newRequestId = () => `cr-${++reqSeq}`;
@@ -41,6 +42,30 @@ export function FacilitiesBoard() {
   const [anchor, setAnchor] = useState<Date>(DEMO_ANCHOR);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [wizardOpen, setWizardOpen] = useState(false);
+
+  // Fit exactly 7 days into the visible width so the whole week is
+  // visible without horizontal scrolling by default — recomputed on
+  // resize. Falls back to DEFAULT_PX_PER_HOUR (and normal scrolling)
+  // if the window is too narrow to keep hours legible.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [pxPerHour, setPxPerHour] = useState(DEFAULT_PX_PER_HOUR);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const LABEL_COLUMN_WIDTH = 200;
+
+    function recalc() {
+      const available = el!.clientWidth - LABEL_COLUMN_WIDTH;
+      const fit = available / (7 * 24);
+      setPxPerHour(Math.min(MAX_PX_PER_HOUR, Math.max(MIN_PX_PER_HOUR, fit)));
+    }
+
+    recalc();
+    const ro = new ResizeObserver(recalc);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [viewMode]);
 
   const days = useMemo(() => weekOf(anchor), [anchor]);
   const weekStartMs = useMemo(() => new Date(`${days[0].date}T00:00:00`).getTime(), [days]);
@@ -327,11 +352,11 @@ export function FacilitiesBoard() {
       </div>
 
       {viewMode === 'week' ? (
-        <div className="min-h-0 flex-1 overflow-auto" onClick={() => setSelected(null)}>
+        <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto" onClick={() => setSelected(null)}>
           <div className="inline-block min-w-full">
             <div className="sticky top-0 z-20 flex bg-[var(--panel)]">
               <div className="sticky left-0 z-30 w-[200px] shrink-0 border-b border-r border-[var(--line)] bg-[var(--panel)]" />
-              <TimeRuler days={days} />
+              <TimeRuler days={days} pxPerHour={pxPerHour} />
             </div>
             {resources.map((r) => (
               <ResourceRow
@@ -340,6 +365,7 @@ export function FacilitiesBoard() {
                 events={events.filter((e) => e.resourceId === r.id && days.some((d) => e.start.startsWith(d.date)))}
                 conflictIds={conflictedIds}
                 weekStartMs={weekStartMs}
+                pxPerHour={pxPerHour}
                 checkValid={checkValid}
                 onDrop={handleDrop}
                 onClickEvent={(ev) => setSelected(ev)}

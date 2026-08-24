@@ -1,6 +1,8 @@
 import type { FacilityEventType } from './facilityTypes';
 
-export const PX_PER_HOUR = 34;
+export const DEFAULT_PX_PER_HOUR = 34; // fallback before the container is measured
+export const MIN_PX_PER_HOUR = 6; // below this, hour ticks/labels stop being legible — horizontal scroll takes over
+export const MAX_PX_PER_HOUR = 34; // don't stretch blocks absurdly wide on very large screens
 export const ROW_HEIGHT = 52;
 export const SNAP_HOURS = 0.25; // 15 minutes
 

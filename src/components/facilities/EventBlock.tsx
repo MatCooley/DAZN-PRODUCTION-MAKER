@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { Link2, Repeat, Users } from 'lucide-react';
 import type { FacilityEvent } from '../../lib/facilityTypes';
-import { PX_PER_HOUR, SNAP_HOURS, conflictStyle, facilityEventStyle } from '../../lib/facilityVisuals';
+import { SNAP_HOURS, conflictStyle, facilityEventStyle } from '../../lib/facilityVisuals';
 
 const DRAGGABLE_TYPES = new Set(['BOOKING', 'HOLD', 'MAINTENANCE', 'BLACKOUT']);
 const CLICK_THRESHOLD_PX = 4;
@@ -11,6 +11,7 @@ export function EventBlock({
   leftPx,
   widthPx,
   hasConflict,
+  pxPerHour,
   checkValid,
   onDrop,
   onClick,
@@ -19,6 +20,7 @@ export function EventBlock({
   leftPx: number;
   widthPx: number;
   hasConflict: boolean;
+  pxPerHour: number;
   checkValid: (start: Date, end: Date) => boolean;
   onDrop: (id: string, start: Date, end: Date, valid: boolean) => void;
   onClick: (event: FacilityEvent) => void;
@@ -38,9 +40,9 @@ export function EventBlock({
     function handleMove(ev: MouseEvent) {
       const rawDeltaPx = ev.clientX - startClientX;
       moved.current = Math.abs(rawDeltaPx);
-      const deltaHours = rawDeltaPx / PX_PER_HOUR;
+      const deltaHours = rawDeltaPx / pxPerHour;
       const snapped = Math.round(deltaHours / SNAP_HOURS) * SNAP_HOURS;
-      const snappedPx = snapped * PX_PER_HOUR;
+      const snappedPx = snapped * pxPerHour;
       const newStart = new Date(origStart.getTime() + snapped * 3_600_000);
       const newEnd = new Date(origEnd.getTime() + snapped * 3_600_000);
       setDrag({ deltaPx: snappedPx, valid: checkValid(newStart, newEnd) });
@@ -57,7 +59,7 @@ export function EventBlock({
       }
 
       const rawDeltaPx = ev.clientX - startClientX;
-      const deltaHours = rawDeltaPx / PX_PER_HOUR;
+      const deltaHours = rawDeltaPx / pxPerHour;
       const snapped = Math.round(deltaHours / SNAP_HOURS) * SNAP_HOURS;
       const newStart = new Date(origStart.getTime() + snapped * 3_600_000);
       const newEnd = new Date(origEnd.getTime() + snapped * 3_600_000);
