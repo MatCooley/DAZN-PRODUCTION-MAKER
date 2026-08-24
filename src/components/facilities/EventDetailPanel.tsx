@@ -1,6 +1,7 @@
 import { X, Link2, Repeat, Users } from 'lucide-react';
 import type { ChangeRequest, FacilityEvent } from '../../lib/facilityTypes';
 import { facilityEventLabel, facilityEventStyle } from '../../lib/facilityVisuals';
+import { showLibrary } from '../../lib/showLibrary';
 
 function fmt(iso: string) {
   const d = new Date(iso);
@@ -28,9 +29,11 @@ export function EventDetailPanel({
   onClose: () => void;
 }) {
   const style = facilityEventStyle[event.eventType];
+  const show = event.showKey ? showLibrary.find((s) => s.key === event.showKey) : undefined;
+  const currency = (n: number) => `$${n.toLocaleString('en-AU', { maximumFractionDigits: 0 })}`;
 
   return (
-    <div className="absolute right-3 top-3 z-30 w-[280px] rounded-lg border border-[var(--line)] bg-[var(--panel-raised)] p-3.5 shadow-xl">
+    <div className="absolute right-3 top-3 z-30 w-[300px] rounded-lg border border-[var(--line)] bg-[var(--panel-raised)] p-3.5 shadow-xl">
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: style.border }} />
@@ -88,6 +91,42 @@ export function EventDetailPanel({
               {c.title ?? c.eventType} · {fmt(c.start)}
             </p>
           ))}
+        </div>
+      )}
+
+      {show && (
+        <div className="mt-3 space-y-2 border-t border-[var(--line)] pt-2.5">
+          <p className="font-mono text-[9.5px] uppercase tracking-wide text-[var(--tally)]">
+            Crew & cost (source: Studio_Staff_cost.xlsx)
+          </p>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+            <span className="text-[var(--text-muted)]">Crew this booking</span>
+            <span className="text-right text-[var(--text-primary)]">{show.crew.reduce((n, c) => n + c.count, 0)} people</span>
+            <span className="text-[var(--text-muted)]">Booking cost</span>
+            <span className="text-right text-[var(--text-primary)]">{currency(show.totalCrewCost)}</span>
+            {show.episodes != null && (
+              <>
+                <span className="text-[var(--text-muted)]">Episodes / season</span>
+                <span className="text-right text-[var(--text-primary)]">{show.episodes}</span>
+              </>
+            )}
+            {show.seriesCost != null && (
+              <>
+                <span className="text-[var(--text-muted)]">Series cost</span>
+                <span className="text-right text-[var(--text-primary)]">{currency(show.seriesCost)}</span>
+              </>
+            )}
+          </div>
+          <div className="max-h-[110px] space-y-0.5 overflow-y-auto rounded-md bg-[var(--panel)] p-1.5">
+            {show.crew.map((c, i) => (
+              <div key={i} className="flex justify-between text-[10px]">
+                <span className="text-[var(--text-muted)]">
+                  {c.count > 1 ? `${c.count}× ` : ''}{c.role}
+                </span>
+                <span className="font-mono text-[var(--text-primary)]">{currency(c.totalCost)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 

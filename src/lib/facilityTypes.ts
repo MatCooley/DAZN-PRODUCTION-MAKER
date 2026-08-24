@@ -38,6 +38,9 @@ export interface FacilityEvent {
   // Recurring roster/booking template linkage.
   seriesId?: string;
   isModifiedOccurrence?: boolean;
+  // Links this instance to a real show template in showLibrary.ts, so
+  // the detail panel can show actual crew/cost data for this booking.
+  showKey?: string;
 }
 
 export type AccessLevel = 'READ_ONLY' | 'NOTE_ONLY' | 'EDIT' | 'SUPERUSER';
