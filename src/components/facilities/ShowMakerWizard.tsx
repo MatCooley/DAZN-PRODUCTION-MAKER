@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { X, ChevronLeft, ChevronRight, Search, Check } from 'lucide-react';
 import { showLibrary, type ShowTemplate } from '../../lib/showLibrary';
-import { studioResourceMap, resources } from '../../lib/facilityData';
+import { resolveBookingResourceIds, bookingTargetOptions } from '../../lib/facilityData';
 import { statusColor } from '../../lib/visuals';
 import { DatePicker } from './DatePicker';
 import type { BookingDraft } from '../../lib/facilityTypes';
@@ -32,6 +32,7 @@ export function ShowMakerWizard({
   const [draft, setDraft] = useState<BookingDraft>({
     template: null,
     studio: '',
+    resourceSelection: 'BOTH',
     date: '2026-08-24',
     startTime: '18:00',
     durationHours: 4,
@@ -55,6 +56,7 @@ export function ShowMakerWizard({
         ...d,
         template: t,
         studio: t?.studio ?? d.studio,
+        resourceSelection: 'BOTH',
         durationHours: defaultDuration(t),
         title: t?.name ?? d.title,
         production: t?.name ?? d.production,
@@ -76,7 +78,7 @@ export function ShowMakerWizard({
   }
 
   const occurrences = useMemo(() => generateOccurrences(draft), [draft]);
-  const resourceIds = draft.studio ? studioResourceMap[draft.studio] ?? [] : [];
+  const resourceIds = draft.studio ? resolveBookingResourceIds(draft.studio, draft.resourceSelection) : [];
   const start = occurrences[0]?.start ?? null;
   const end = occurrences[0]?.end ?? null;
 
@@ -86,7 +88,7 @@ export function ShowMakerWizard({
   );
   const conflictingOccurrences = occurrenceChecks.filter((o) => o.check && !o.check.free);
 
-  const studioOptions = Object.keys(studioResourceMap);
+  const targetOptions = useMemo(() => bookingTargetOptions(), []);
   const canProceedStep1 = !!draft.studio && !!draft.date && !!draft.startTime && draft.durationHours > 0;
   const canSubmit = canProceedStep1 && !!draft.title;
   const isRecurring = occurrences.length > 1;
@@ -171,16 +173,19 @@ export function ShowMakerWizard({
                   className="input"
                 />
               </Field>
-              <Field label="Studio">
+              <Field label="Where">
                 <select
-                  value={draft.studio}
-                  onChange={(e) => setDraft((d) => ({ ...d, studio: e.target.value }))}
+                  value={draft.studio ? `${draft.studio}|${draft.resourceSelection}` : ''}
+                  onChange={(e) => {
+                    const [studio, selection] = e.target.value.split('|') as [string, BookingDraft['resourceSelection']];
+                    setDraft((d) => ({ ...d, studio, resourceSelection: selection ?? 'BOTH' }));
+                  }}
                   className="input"
                 >
-                  <option value="">Select a studio…</option>
-                  {studioOptions.map((s) => (
-                    <option key={s} value={s}>
-                      Studio {s} {resources.find((r) => r.id === studioResourceMap[s][0])?.name.includes('Floor') ? '' : ''}
+                  <option value="">Select a studio / resource…</option>
+                  {targetOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
                     </option>
                   ))}
                 </select>

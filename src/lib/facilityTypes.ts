@@ -56,6 +56,7 @@ export interface SimUser {
 export interface BookingDraft {
   template: ShowTemplate | null;
   studio: string; // 'A' | 'B' | 'C' | 'D'
+  resourceSelection: 'BOTH' | 'CR' | 'FL'; // which of Control Room/Floor to book — 'BOTH' when only one exists
   date: string; // YYYY-MM-DD — first occurrence's date
   startTime: string; // HH:mm
   durationHours: number;

@@ -47,6 +47,45 @@ export const studioResourceMap: Record<string, string[]> = {
   D: ['r-d-cr'],
 };
 
+export type ResourceSelection = 'BOTH' | 'CR' | 'FL';
+
+/** Resolves a studio letter + CR/Floor/Both selection into actual resource ids.
+ * For studios with only a Control Room (C, D), selection is ignored. */
+export function resolveBookingResourceIds(studio: string, selection: ResourceSelection): string[] {
+  const ids = studioResourceMap[studio];
+  if (!ids) return [];
+  const [cr, fl] = ids;
+  if (!fl) return [cr]; // no Floor resource for this studio — always just the Control Room
+  if (selection === 'CR') return [cr];
+  if (selection === 'FL') return [fl];
+  return [cr, fl];
+}
+
+export interface BookingTargetOption {
+  value: string; // `${studio}|${selection}`
+  studio: string;
+  selection: ResourceSelection;
+  label: string;
+}
+
+/** Flat list of every bookable studio/resource combination, for the
+ * wizard's "where" selector — grouped by studio, offering Control Room
+ * + Floor together or either one alone where both exist. */
+export function bookingTargetOptions(): BookingTargetOption[] {
+  const options: BookingTargetOption[] = [];
+  for (const studio of Object.keys(studioResourceMap)) {
+    const ids = studioResourceMap[studio];
+    if (ids.length > 1) {
+      options.push({ value: `${studio}|BOTH`, studio, selection: 'BOTH', label: `Studio ${studio} — Control Room + Floor` });
+      options.push({ value: `${studio}|CR`, studio, selection: 'CR', label: `Studio ${studio} — Control Room only` });
+      options.push({ value: `${studio}|FL`, studio, selection: 'FL', label: `Studio ${studio} — Floor only` });
+    } else {
+      options.push({ value: `${studio}|BOTH`, studio, selection: 'BOTH', label: `Studio ${studio} — Control Room` });
+    }
+  }
+  return options;
+}
+
 let seq = 0;
 const id = () => `fe-${++seq}`;
 
