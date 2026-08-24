@@ -1,5 +1,5 @@
 import type { FacilityEvent, Resource } from '../../lib/facilityTypes';
-import { ROW_HEIGHT } from '../../lib/facilityVisuals';
+import { ROW_HEIGHT, studioColorFor } from '../../lib/facilityVisuals';
 import { EventBlock } from './EventBlock';
 
 export function ResourceRow({
@@ -25,6 +25,7 @@ export function ResourceRow({
 }) {
   const dayWidth = 24 * pxPerHour;
   const trackWidth = dayCount * dayWidth;
+  const bookingColor = studioColorFor(resource.code);
 
   function pxFor(iso: string) {
     const hoursFromStart = (new Date(iso).getTime() - weekStartMs) / 3_600_000;
@@ -55,6 +56,7 @@ export function ResourceRow({
             widthPx={pxFor(ev.end) - pxFor(ev.start)}
             hasConflict={conflictIds.has(ev.id)}
             pxPerHour={pxPerHour}
+            bookingColor={bookingColor}
             checkValid={(start, end) => checkValid(ev, start, end)}
             onDrop={onDrop}
             onClick={onClickEvent}

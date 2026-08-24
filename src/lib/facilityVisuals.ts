@@ -30,3 +30,28 @@ export const facilityEventLabel: Record<FacilityEventType, string> = {
   BLACKOUT: 'Blackout',
   AVAILABILITY_WINDOW: 'Available',
 };
+
+// Per-studio accent colors — CONFIRMED BOOKINGS only are tinted by which
+// studio they're in, so you can recognize a studio's pattern at a glance
+// without reading every row label. Status colors (conflict=red,
+// hold=grey, available=green, blackout=near-black) stay universal and
+// reserved — they're never overridden by studio color, since diluting
+// "this is a conflict" with a studio hue would defeat the point of the
+// signal. Hues are deliberately spaced away from signal-green (~150°)
+// and signal-red (~5°) so nothing gets mistaken for a status color.
+export const studioAccentColor: Record<string, { fill: string; border: string; textColor: string }> = {
+  A: { fill: '#E8A93C', border: '#E8A93C', textColor: '#1a1508' }, // amber
+  B: { fill: '#35C1D6', border: '#35C1D6', textColor: '#052024' }, // cyan (matches the tally accent)
+  C: { fill: '#9B87E8', border: '#9B87E8', textColor: '#1c1533' }, // violet
+  D: { fill: '#E86B9E', border: '#E86B9E', textColor: '#330f1c' }, // rose
+};
+export const studioAccentFallback = studioAccentColor.A;
+
+/** Extracts the studio letter from a resource code like 'ST_A_CR' -> 'A'. */
+export function studioLetterOf(code: string): string {
+  return code.match(/^ST_([A-Z])_/)?.[1] ?? '?';
+}
+
+export function studioColorFor(code: string) {
+  return studioAccentColor[studioLetterOf(code)] ?? studioAccentFallback;
+}

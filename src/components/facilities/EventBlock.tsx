@@ -13,6 +13,7 @@ export function EventBlock({
   widthPx,
   hasConflict,
   pxPerHour,
+  bookingColor,
   checkValid,
   onDrop,
   onClick,
@@ -22,6 +23,7 @@ export function EventBlock({
   widthPx: number;
   hasConflict: boolean;
   pxPerHour: number;
+  bookingColor: { fill: string; border: string; textColor: string };
   checkValid: (start: Date, end: Date) => boolean;
   onDrop: (id: string, start: Date, end: Date, valid: boolean) => void;
   onClick: (event: FacilityEvent) => void;
@@ -75,7 +77,11 @@ export function EventBlock({
     window.addEventListener('mouseup', handleUp);
   }
 
-  const style = facilityEventStyle[event.eventType];
+  // Only CONFIRMED bookings get the studio accent color — holds,
+  // maintenance, blackouts and availability windows keep their universal
+  // status colors so those signals never get diluted by which studio
+  // they're in.
+  const style = event.eventType === 'BOOKING' ? bookingColor : facilityEventStyle[event.eventType];
   const showConflict = hasConflict && !drag;
   const dragInvalid = drag && !drag.valid;
   const isAvailability = event.eventType === 'AVAILABILITY_WINDOW';

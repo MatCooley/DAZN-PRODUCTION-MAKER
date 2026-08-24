@@ -2,6 +2,7 @@ import type { DateBucket } from '../../lib/dateRanges';
 import type { FacilityEvent, Resource } from '../../lib/facilityTypes';
 import { overlaps } from '../../lib/facilityLogic';
 import { statusColor } from '../../lib/visuals';
+import { studioColorFor } from '../../lib/facilityVisuals';
 
 type CellStatus = 'conflict' | 'booked' | 'hold' | 'available' | 'empty';
 
@@ -31,9 +32,8 @@ function bucketStatus(
   return { status, count: blocking.length, titles: blocking.map((e) => e.title ?? e.eventType) };
 }
 
-const cellColor: Record<CellStatus, string> = {
+const cellColor: Record<Exclude<CellStatus, 'booked'>, string> = {
   conflict: statusColor.breach,
-  booked: '#E8A93C',
   hold: '#8B98A5',
   available: statusColor.ok,
   empty: 'transparent',
@@ -80,6 +80,7 @@ export function DensityGrid({
             </div>
             {buckets.map((b) => {
               const cell = bucketStatus(r.id, b, events, conflictedIds);
+              const bookedColor = studioColorFor(r.code).fill;
               return (
                 <button
                   key={b.key}
@@ -94,7 +95,8 @@ export function DensityGrid({
                       style={{
                         width: Math.max(cellWidth - 4, 4),
                         height: 18,
-                        backgroundColor: cell.status === 'available' ? 'transparent' : cellColor[cell.status],
+                        backgroundColor:
+                          cell.status === 'available' ? 'transparent' : cell.status === 'booked' ? bookedColor : cellColor[cell.status],
                         border: cell.status === 'available' ? `1px dashed ${cellColor.available}` : 'none',
                         opacity: cell.status === 'hold' ? 0.7 : 1,
                       }}

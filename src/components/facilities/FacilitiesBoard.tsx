@@ -24,7 +24,7 @@ import { RoleSwitcher } from './RoleSwitcher';
 import { NotificationBell } from './NotificationBell';
 import { ShowMakerWizard } from './ShowMakerWizard';
 import { statusColor } from '../../lib/visuals';
-import { DEFAULT_PX_PER_HOUR, MIN_PX_PER_HOUR, MAX_PX_PER_HOUR_WEEK, MAX_PX_PER_HOUR_DAY } from '../../lib/facilityVisuals';
+import { DEFAULT_PX_PER_HOUR, MIN_PX_PER_HOUR, MAX_PX_PER_HOUR_WEEK, MAX_PX_PER_HOUR_DAY, studioAccentColor } from '../../lib/facilityVisuals';
 
 let reqSeq = 0;
 const newRequestId = () => `cr-${++reqSeq}`;
@@ -271,6 +271,11 @@ export function FacilitiesBoard() {
     );
   }
 
+  function handleDayHeaderClick(dateStr: string) {
+    setAnchor(new Date(`${dateStr}T00:00:00`));
+    setViewMode('day');
+  }
+
   function handleBucketClick(bucket: DateBucket) {
     if (viewMode === 'year') {
       setAnchor(bucket.start);
@@ -332,6 +337,14 @@ export function FacilitiesBoard() {
           )}
         </div>
         <div className="flex items-center gap-3">
+          <div className="hidden items-center gap-2 border-r border-[var(--line)] pr-3 font-mono text-[9.5px] text-[var(--text-muted)] lg:flex">
+            {Object.entries(studioAccentColor).map(([letter, color]) => (
+              <span key={letter} className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color.fill }} />
+                {letter}
+              </span>
+            ))}
+          </div>
           <button
             onClick={() => setWizardOpen(true)}
             className="flex items-center gap-1 rounded-md border border-[var(--tally)]/50 bg-[var(--tally)]/10 px-2.5 py-1.5 font-mono text-[10.5px] text-[var(--tally)] transition hover:bg-[var(--tally)]/20"
@@ -361,7 +374,7 @@ export function FacilitiesBoard() {
           <div className="inline-block min-w-full">
             <div className="sticky top-0 z-20 flex bg-[var(--panel)]">
               <div className="sticky left-0 z-30 w-[200px] shrink-0 border-b border-r border-[var(--line)] bg-[var(--panel)]" />
-              <TimeRuler days={days} pxPerHour={pxPerHour} />
+              <TimeRuler days={days} pxPerHour={pxPerHour} onDayClick={handleDayHeaderClick} />
             </div>
             {resources.map((r) => (
               <ResourceRow
