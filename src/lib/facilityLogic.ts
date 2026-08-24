@@ -1,4 +1,5 @@
-import type { FacilityEvent, Resource } from './facilityTypes';
+import type { FacilityEvent, Resource, BookingDraft } from './facilityTypes';
+import { startOfWeekMonday } from './dateUtils';
 
 // Half-open interval overlap: A_start < B_end AND B_start < A_end.
 // Back-to-back events (10:00–11:00, 11:00–12:00) correctly do NOT overlap.
@@ -34,6 +35,37 @@ export function computeConflicts(events: FacilityEvent[]): ConflictMap {
     }
   }
   return map;
+}
+
+// Expands a BookingDraft's recurrence into concrete {start, end} pairs.
+// `date` is the anchor — the first occurrence's calendar date. repeatDays
+// (0=Sun..6=Sat) selects which weekdays within the anchor's week (and
+// every subsequent week) get an occurrence; any candidate date earlier
+// than the anchor itself is skipped, so picking a Wednesday anchor with
+// Mon/Tue also selected doesn't retroactively add bookings in the past —
+// those weekdays simply start the following week.
+export function generateOccurrences(draft: BookingDraft): { start: Date; end: Date }[] {
+  const anchor = new Date(`${draft.date}T${draft.startTime}:00`);
+  const anchorDay = new Date(`${draft.date}T00:00:00`);
+  const days = draft.repeatDays.length > 0 ? draft.repeatDays : [anchorDay.getDay()];
+  const weeks = Math.max(1, draft.repeatWeeks);
+  const monday = startOfWeekMonday(anchorDay);
+
+  const occurrences: { start: Date; end: Date }[] = [];
+  for (let w = 0; w < weeks; w++) {
+    for (const dow of days) {
+      const offsetFromMonday = dow === 0 ? 6 : dow - 1; // Mon=0 ... Sun=6
+      const occurrenceDay = new Date(monday);
+      occurrenceDay.setDate(monday.getDate() + w * 7 + offsetFromMonday);
+      if (occurrenceDay.getTime() < anchorDay.getTime()) continue; // before the chosen start date
+
+      const start = new Date(occurrenceDay);
+      start.setHours(anchor.getHours(), anchor.getMinutes(), 0, 0);
+      const end = new Date(start.getTime() + draft.durationHours * 3_600_000);
+      occurrences.push({ start, end });
+    }
+  }
+  return occurrences.sort((a, b) => a.start.getTime() - b.start.getTime());
 }
 
 // For a NEW booking (no existing event to exclude) spanning one or more

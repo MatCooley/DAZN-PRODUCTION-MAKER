@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, CalendarClock } from 'lucide-react';
 import { resources, initialFacilityEvents, weekOf, weekStartISO } from '../../lib/facilityData';
-import type { ChangeRequest, FacilityEvent, SimUser } from '../../lib/facilityTypes';
-import { computeConflicts, overlaps, checkResourcesFree } from '../../lib/facilityLogic';
+import type { ChangeRequest, FacilityEvent, SimUser, BookingDraft } from '../../lib/facilityTypes';
+import { computeConflicts, overlaps, checkResourcesFree, generateOccurrences } from '../../lib/facilityLogic';
 import { canEditDirectly, simUsers } from '../../lib/users';
+import { toLocalDateTimeString } from '../../lib/dateUtils';
 import {
   type ViewMode,
   type DateBucket,
@@ -20,7 +21,7 @@ import { ViewModeSwitcher } from './ViewModeSwitcher';
 import { EventDetailPanel } from './EventDetailPanel';
 import { RoleSwitcher } from './RoleSwitcher';
 import { NotificationBell } from './NotificationBell';
-import { ShowMakerWizard, type BookingDraft } from './ShowMakerWizard';
+import { ShowMakerWizard } from './ShowMakerWizard';
 import { statusColor } from '../../lib/visuals';
 import { DEFAULT_PX_PER_HOUR, MIN_PX_PER_HOUR, MAX_PX_PER_HOUR } from '../../lib/facilityVisuals';
 
@@ -30,6 +31,8 @@ let evSeq = 1000;
 const newEventId = () => `fe-new-${++evSeq}`;
 let linkSeq = 0;
 const newLinkId = () => `link-new-${++linkSeq}`;
+let seriesSeq = 0;
+const newSeriesId = () => `series-new-${++seriesSeq}`;
 
 const DEMO_ANCHOR = new Date(weekStartISO);
 
@@ -135,8 +138,8 @@ export function FacilitiesBoard() {
         const newEnd = new Date(new Date(e.end).getTime() + deltaMs);
         return {
           ...e,
-          start: newStart.toISOString().slice(0, 19),
-          end: newEnd.toISOString().slice(0, 19),
+          start: toLocalDateTimeString(newStart),
+          end: toLocalDateTimeString(newEnd),
           isModifiedOccurrence: e.seriesId ? true : e.isModifiedOccurrence,
         };
       })
@@ -165,8 +168,8 @@ export function FacilitiesBoard() {
       requestType: 'MOVE',
       targetEventId: id,
       requestedById: currentUser.id,
-      proposedStart: start.toISOString().slice(0, 19),
-      proposedEnd: end.toISOString().slice(0, 19),
+      proposedStart: toLocalDateTimeString(start),
+      proposedEnd: toLocalDateTimeString(end),
       status: 'PENDING',
       wasValidAtRequestTime: valid,
       createdAt: new Date().toISOString(),
@@ -175,60 +178,66 @@ export function FacilitiesBoard() {
     showToast(`Change proposed for "${event.title ?? event.eventType}" — awaiting approval`);
   }
 
-  function buildNewEvents(draft: BookingDraft, resourceIds: string[]): FacilityEvent[] {
-    const start = new Date(`${draft.date}T${draft.startTime}:00`);
-    const end = new Date(start.getTime() + draft.durationHours * 3_600_000);
-    const linkId = resourceIds.length > 1 ? newLinkId() : undefined;
-    return resourceIds.map((resourceId) => ({
-      id: newEventId(),
-      resourceId,
-      eventType: 'BOOKING',
-      isBlocking: true,
-      start: start.toISOString().slice(0, 19),
-      end: end.toISOString().slice(0, 19),
-      status: 'CONFIRMED',
-      title: draft.title,
-      production: draft.production || undefined,
-      client: draft.client || undefined,
-      showKey: draft.template?.key,
-      linkedBookingSetId: linkId,
-    }));
+  function buildEventsForDraft(draft: BookingDraft, resourceIds: string[]): FacilityEvent[] {
+    const occurrences = generateOccurrences(draft);
+    const seriesId = occurrences.length > 1 ? newSeriesId() : undefined;
+    const newEvents: FacilityEvent[] = [];
+    for (const occ of occurrences) {
+      const linkId = resourceIds.length > 1 ? newLinkId() : undefined;
+      for (const resourceId of resourceIds) {
+        newEvents.push({
+          id: newEventId(),
+          resourceId,
+          eventType: 'BOOKING',
+          isBlocking: true,
+          start: toLocalDateTimeString(occ.start),
+          end: toLocalDateTimeString(occ.end),
+          status: 'CONFIRMED',
+          title: draft.title,
+          production: draft.production || undefined,
+          client: draft.client || undefined,
+          showKey: draft.template?.key,
+          linkedBookingSetId: linkId,
+          seriesId,
+        });
+      }
+    }
+    return newEvents;
   }
 
   function handleWizardSubmit(draft: BookingDraft, resourceIds: string[]) {
-    const start = new Date(`${draft.date}T${draft.startTime}:00`);
-    const end = new Date(start.getTime() + draft.durationHours * 3_600_000);
-    const freeCheck = checkResourcesFree(resourceIds, start, end, events);
+    const occurrences = generateOccurrences(draft);
+    const conflicting = occurrences.filter((o) => !checkResourcesFree(resourceIds, o.start, o.end, events).free);
+    const allFree = conflicting.length === 0;
+    const label = occurrences.length > 1 ? `"${draft.title}" (${occurrences.length} occurrences)` : `"${draft.title}"`;
 
     if (canEditDirectly(currentUser.accessLevel)) {
-      if (!freeCheck.free) {
-        showToast(`Booking blocked — conflicts with ${freeCheck.blockedBy.join(', ')}`);
+      if (!allFree) {
+        showToast(`Booking blocked — ${conflicting.length} of ${occurrences.length} occurrences conflict`);
         return;
       }
-      const newEvents = buildNewEvents(draft, resourceIds);
+      const newEvents = buildEventsForDraft(draft, resourceIds);
       setEvents((prev) => [...prev, ...newEvents]);
-      showToast(`Created "${draft.title}"${resourceIds.length > 1 ? ' (Control Room + Floor)' : ''}`);
+      showToast(`Created ${label}${resourceIds.length > 1 ? ' (Control Room + Floor)' : ''}`);
       setWizardOpen(false);
       return;
     }
 
+    const first = occurrences[0];
     const request: ChangeRequest = {
       id: newRequestId(),
       requestType: 'CREATE',
       requestedById: currentUser.id,
-      proposedStart: start.toISOString().slice(0, 19),
-      proposedEnd: end.toISOString().slice(0, 19),
+      proposedStart: toLocalDateTimeString(first.start),
+      proposedEnd: toLocalDateTimeString(first.end),
       status: 'PENDING',
-      wasValidAtRequestTime: freeCheck.free,
+      wasValidAtRequestTime: allFree,
       createdAt: new Date().toISOString(),
       proposedResourceIds: resourceIds,
-      proposedTitle: draft.title,
-      proposedProduction: draft.production || undefined,
-      proposedClient: draft.client || undefined,
-      proposedShowKey: draft.template?.key,
+      proposedDraft: draft,
     };
     setChangeRequests((prev) => [...prev, request]);
-    showToast(`"${draft.title}" proposed — awaiting approval`);
+    showToast(`${label} proposed — awaiting approval`);
     setWizardOpen(false);
   }
 
@@ -238,24 +247,10 @@ export function FacilitiesBoard() {
 
     if (req.requestType === 'MOVE' && req.targetEventId) {
       commitMove(req.targetEventId, new Date(req.proposedStart), new Date(req.proposedEnd), false);
-    } else if (req.requestType === 'CREATE' && req.proposedResourceIds) {
-      const linkId = req.proposedResourceIds.length > 1 ? newLinkId() : undefined;
-      const newEvents: FacilityEvent[] = req.proposedResourceIds.map((resourceId) => ({
-        id: newEventId(),
-        resourceId,
-        eventType: 'BOOKING',
-        isBlocking: true,
-        start: req.proposedStart,
-        end: req.proposedEnd,
-        status: 'CONFIRMED',
-        title: req.proposedTitle,
-        production: req.proposedProduction,
-        client: req.proposedClient,
-        showKey: req.proposedShowKey,
-        linkedBookingSetId: linkId,
-      }));
+    } else if (req.requestType === 'CREATE' && req.proposedResourceIds && req.proposedDraft) {
+      const newEvents = buildEventsForDraft(req.proposedDraft, req.proposedResourceIds);
       setEvents((prev) => [...prev, ...newEvents]);
-      showToast(`Approved and created "${req.proposedTitle}"`);
+      showToast(`Approved and created "${req.proposedDraft.title}" (${newEvents.length / req.proposedResourceIds.length} occurrence${newEvents.length / req.proposedResourceIds.length === 1 ? '' : 's'})`);
     }
 
     setChangeRequests((prev) =>

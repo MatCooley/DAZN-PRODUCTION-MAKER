@@ -1,3 +1,5 @@
+import type { ShowTemplate } from './showLibrary';
+
 export type FacilityEventType = 'BOOKING' | 'HOLD' | 'MAINTENANCE' | 'BLACKOUT' | 'AVAILABILITY_WINDOW';
 
 export interface Resource {
@@ -51,6 +53,22 @@ export interface SimUser {
   accessLevel: AccessLevel;
 }
 
+export interface BookingDraft {
+  template: ShowTemplate | null;
+  studio: string; // 'A' | 'B' | 'C' | 'D'
+  date: string; // YYYY-MM-DD — first occurrence's date
+  startTime: string; // HH:mm
+  durationHours: number;
+  title: string;
+  production: string;
+  client: string;
+  // Recurrence: which weekdays (0=Sun..6=Sat, matching Date.getDay()) this
+  // booking repeats on, and for how many weeks. [] or length-1 arrays with
+  // repeatWeeks=1 behave as a one-off booking on `date` only.
+  repeatDays: number[];
+  repeatWeeks: number;
+}
+
 export interface ChangeRequest {
   id: string;
   requestType: 'MOVE' | 'CREATE';
@@ -63,11 +81,9 @@ export interface ChangeRequest {
   wasValidAtRequestTime: boolean;
   createdAt: string;
   reviewedById?: string;
-  // Populated for CREATE requests — everything needed to actually build
-  // the new booking(s) on approval.
+  // Populated for CREATE requests — the full draft + resolved resource
+  // ids, so approval can regenerate every occurrence of a recurring
+  // booking exactly as proposed, not just a single start/end.
+  proposedDraft?: BookingDraft;
   proposedResourceIds?: string[];
-  proposedTitle?: string;
-  proposedProduction?: string;
-  proposedClient?: string;
-  proposedShowKey?: string;
 }

@@ -1,5 +1,7 @@
 import type { FacilityEvent, Resource, ResourceDependency } from './facilityTypes';
 
+import { toLocalDateString } from './dateUtils';
+
 export const weekStartISO = '2026-08-24T00:00:00'; // Monday — default/demo week
 const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -18,7 +20,7 @@ export function weekOf(anyDateInWeek: Date): { date: string; label: string }[] {
   return Array.from({ length: 7 }, (_, i) => {
     const day = new Date(monday);
     day.setDate(monday.getDate() + i);
-    return { date: day.toISOString().slice(0, 10), label: DAY_LABELS[day.getDay()] };
+    return { date: toLocalDateString(day), label: DAY_LABELS[day.getDay()] };
   });
 }
 

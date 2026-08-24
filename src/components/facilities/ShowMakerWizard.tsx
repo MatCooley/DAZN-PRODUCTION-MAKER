@@ -3,17 +3,11 @@ import { X, ChevronLeft, ChevronRight, Search, Check } from 'lucide-react';
 import { showLibrary, type ShowTemplate } from '../../lib/showLibrary';
 import { studioResourceMap, resources } from '../../lib/facilityData';
 import { statusColor } from '../../lib/visuals';
+import { DatePicker } from './DatePicker';
+import type { BookingDraft } from '../../lib/facilityTypes';
+import { generateOccurrences } from '../../lib/facilityLogic';
 
-export interface BookingDraft {
-  template: ShowTemplate | null;
-  studio: string; // 'A' | 'B' | 'C' | 'D'
-  date: string; // YYYY-MM-DD
-  startTime: string; // HH:mm
-  durationHours: number;
-  title: string;
-  production: string;
-  client: string;
-}
+const WEEKDAY_SHORT = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 function defaultDuration(t: ShowTemplate | null): number {
   if (!t || t.crew.length === 0) return 4;
@@ -44,6 +38,8 @@ export function ShowMakerWizard({
     title: '',
     production: '',
     client: '',
+    repeatDays: [1], // Monday — matches the default date above
+    repeatWeeks: 1,
   });
 
   const filteredTemplates = useMemo(() => {
@@ -53,25 +49,47 @@ export function ShowMakerWizard({
   }, [query]);
 
   function pickTemplate(t: ShowTemplate | null) {
-    setDraft((d) => ({
-      ...d,
-      template: t,
-      studio: t?.studio ?? d.studio,
-      durationHours: defaultDuration(t),
-      title: t?.name ?? d.title,
-      production: t?.name ?? d.production,
-    }));
+    setDraft((d) => {
+      const anchorDay = new Date(`${d.date}T00:00:00`).getDay();
+      return {
+        ...d,
+        template: t,
+        studio: t?.studio ?? d.studio,
+        durationHours: defaultDuration(t),
+        title: t?.name ?? d.title,
+        production: t?.name ?? d.production,
+        repeatDays: [anchorDay],
+        repeatWeeks: t?.episodes ?? d.repeatWeeks,
+      };
+    });
     setStep(1);
   }
 
+  function toggleDay(dow: number) {
+    setDraft((d) => {
+      const has = d.repeatDays.includes(dow);
+      const next = has ? d.repeatDays.filter((x) => x !== dow) : [...d.repeatDays, dow].sort();
+      // Always keep at least the anchor date's own weekday selected.
+      const anchorDow = new Date(`${d.date}T00:00:00`).getDay();
+      return { ...d, repeatDays: next.length > 0 ? next : [anchorDow] };
+    });
+  }
+
+  const occurrences = useMemo(() => generateOccurrences(draft), [draft]);
   const resourceIds = draft.studio ? studioResourceMap[draft.studio] ?? [] : [];
-  const start = draft.studio ? new Date(`${draft.date}T${draft.startTime}:00`) : null;
-  const end = start ? new Date(start.getTime() + draft.durationHours * 3_600_000) : null;
-  const freeCheck = start && end && resourceIds.length ? checkFree(resourceIds, start, end) : null;
+  const start = occurrences[0]?.start ?? null;
+  const end = occurrences[0]?.end ?? null;
+
+  const occurrenceChecks = useMemo(
+    () => occurrences.map((o) => ({ ...o, check: resourceIds.length ? checkFree(resourceIds, o.start, o.end) : null })),
+    [occurrences, resourceIds, checkFree]
+  );
+  const conflictingOccurrences = occurrenceChecks.filter((o) => o.check && !o.check.free);
 
   const studioOptions = Object.keys(studioResourceMap);
   const canProceedStep1 = !!draft.studio && !!draft.date && !!draft.startTime && draft.durationHours > 0;
   const canSubmit = canProceedStep1 && !!draft.title;
+  const isRecurring = occurrences.length > 1;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
@@ -167,15 +185,24 @@ export function ShowMakerWizard({
                   ))}
                 </select>
               </Field>
-              <div className="grid grid-cols-3 gap-2">
-                <Field label="Date">
-                  <input
-                    type="date"
-                    value={draft.date}
-                    onChange={(e) => setDraft((d) => ({ ...d, date: e.target.value }))}
-                    className="input"
-                  />
-                </Field>
+              <Field label="Date">
+                <DatePicker
+                  value={draft.date}
+                  onChange={(dateStr) =>
+                    setDraft((d) => {
+                      const oldAnchorDow = new Date(`${d.date}T00:00:00`).getDay();
+                      const newAnchorDow = new Date(`${dateStr}T00:00:00`).getDay();
+                      // Swap the old anchor weekday for the new one, keeping any
+                      // other days the user had toggled on.
+                      const repeatDays = d.repeatDays.includes(oldAnchorDow)
+                        ? Array.from(new Set([...d.repeatDays.filter((x) => x !== oldAnchorDow), newAnchorDow])).sort()
+                        : d.repeatDays;
+                      return { ...d, date: dateStr, repeatDays };
+                    })
+                  }
+                />
+              </Field>
+              <div className="grid grid-cols-2 gap-2">
                 <Field label="Start time">
                   <input
                     type="time"
@@ -195,20 +222,65 @@ export function ShowMakerWizard({
                   />
                 </Field>
               </div>
+              <Field label="Repeats on">
+                <div className="flex gap-1">
+                  {WEEKDAY_SHORT.map((label, dow) => {
+                    const active = draft.repeatDays.includes(dow);
+                    return (
+                      <button
+                        type="button"
+                        key={dow}
+                        onClick={() => toggleDay(dow)}
+                        className="flex h-7 w-7 items-center justify-center rounded-full font-mono text-[10px] transition"
+                        style={{
+                          backgroundColor: active ? 'var(--tally)' : 'var(--ink)',
+                          color: active ? 'var(--ink)' : 'var(--text-muted)',
+                          border: `1px solid ${active ? 'var(--tally)' : 'var(--line)'}`,
+                          fontWeight: active ? 700 : 400,
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Field>
+              <Field label="Repeat for how many weeks / episodes">
+                <input
+                  type="number"
+                  min={1}
+                  max={52}
+                  value={draft.repeatWeeks}
+                  onChange={(e) => setDraft((d) => ({ ...d, repeatWeeks: Math.max(1, Number(e.target.value)) }))}
+                  className="input"
+                />
+              </Field>
               {start && end && (
                 <p className="font-mono text-[10.5px] text-[var(--text-muted)]">
-                  {start.toLocaleString('en-AU', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} →{' '}
+                  First: {start.toLocaleString('en-AU', { weekday: 'short', day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false })} →{' '}
                   {end.toLocaleString('en-AU', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}
-                  {resourceIds.length > 1 ? ' · booked across Control Room + Floor' : ''}
+                  {resourceIds.length > 1 ? ' · Control Room + Floor' : ''}
+                  {isRecurring && occurrences.length > 0 && (
+                    <>
+                      {' '}· {occurrences.length} occurrences total, last on{' '}
+                      {occurrences[occurrences.length - 1].start.toLocaleDateString('en-AU', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </>
+                  )}
                 </p>
               )}
-              {freeCheck && !freeCheck.free && (
+              {conflictingOccurrences.length > 0 && (
                 <div
                   className="rounded-md border p-2 text-[11px]"
                   style={{ borderColor: `${statusColor.breach}66`, backgroundColor: `${statusColor.breach}15`, color: statusColor.breach }}
                 >
-                  ⚠ Conflicts with: {freeCheck.blockedBy.join(', ')}
-                  {isNoteOnly ? ' — you can still propose this, a supervisor will see the conflict.' : ' — resolve before creating.'}
+                  ⚠ {conflictingOccurrences.length} of {occurrences.length} occurrence{occurrences.length === 1 ? '' : 's'} conflict
+                  {conflictingOccurrences.length === 1 ? 's' : ''}:{' '}
+                  {conflictingOccurrences
+                    .slice(0, 3)
+                    .map((o) => o.start.toLocaleDateString('en-AU', { day: '2-digit', month: 'short' }))
+                    .join(', ')}
+                  {conflictingOccurrences.length > 3 ? `, +${conflictingOccurrences.length - 3} more` : ''}
+                  {isNoteOnly ? ' — you can still propose this, a supervisor will see the conflicts.' : ' — resolve before creating.'}
                 </div>
               )}
             </div>
@@ -217,7 +289,7 @@ export function ShowMakerWizard({
           {step === 2 && draft.template && (
             <div className="space-y-2">
               <p className="font-mono text-[9.5px] uppercase tracking-wide text-[var(--text-muted)]">
-                Crew pulled from show template
+                Crew pulled from show template{isRecurring ? ' (applied to every occurrence)' : ''}
               </p>
               <div className="max-h-[220px] space-y-0.5 overflow-y-auto rounded-md bg-[var(--panel)] p-2">
                 {draft.template.crew.map((c, i) => (
@@ -231,17 +303,32 @@ export function ShowMakerWizard({
                 ))}
               </div>
               <div className="flex justify-between border-t border-[var(--line)] pt-2 text-[12px]">
-                <span className="text-[var(--text-muted)]">Estimated booking cost</span>
+                <span className="text-[var(--text-muted)]">Cost per occurrence</span>
                 <span className="font-mono font-medium text-[var(--text-primary)]">
                   ${draft.template.totalCrewCost.toLocaleString()}
                 </span>
               </div>
+              {isRecurring && (
+                <div className="flex justify-between text-[12px]">
+                  <span className="text-[var(--text-muted)]">
+                    Projected total ({occurrences.length} × ${draft.template.totalCrewCost.toLocaleString()})
+                  </span>
+                  <span className="font-mono font-medium text-[var(--tally)]">
+                    ${(draft.template.totalCrewCost * occurrences.length).toLocaleString()}
+                  </span>
+                </div>
+              )}
             </div>
           )}
           {step === 2 && !draft.template && (
-            <p className="text-[12px] text-[var(--text-muted)]">
-              No show template selected — this will be created as a custom booking with no crew cost estimate.
-            </p>
+            <div className="space-y-1">
+              <p className="text-[12px] text-[var(--text-muted)]">
+                No show template selected — this will be created as a custom booking with no crew cost estimate.
+              </p>
+              {isRecurring && (
+                <p className="text-[12px] text-[var(--text-muted)]">Will create {occurrences.length} occurrences.</p>
+              )}
+            </div>
           )}
         </div>
 

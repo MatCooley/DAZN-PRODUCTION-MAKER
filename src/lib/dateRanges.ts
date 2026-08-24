@@ -1,3 +1,5 @@
+import { toLocalDateString } from './dateUtils';
+
 export type ViewMode = 'week' | 'month' | 'quarter' | 'year';
 
 export interface DateBucket {
@@ -27,7 +29,7 @@ export function monthDayBuckets(anchor: Date): DateBucket[] {
     const end = new Date(start);
     end.setDate(end.getDate() + 1);
     return {
-      key: start.toISOString().slice(0, 10),
+      key: toLocalDateString(start),
       label: String(i + 1),
       sublabel: DAY_LABELS[start.getDay()],
       start,
@@ -48,7 +50,7 @@ export function quarterDayBuckets(anchor: Date): DateBucket[] {
       const end = new Date(start);
       end.setDate(end.getDate() + 1);
       buckets.push({
-        key: start.toISOString().slice(0, 10),
+        key: toLocalDateString(start),
         label: d === 1 ? MONTH_NAMES[m] : String(d),
         start,
         end,
