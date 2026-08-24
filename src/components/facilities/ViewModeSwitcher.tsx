@@ -1,7 +1,8 @@
-import { CalendarDays, Calendar, CalendarRange, CalendarFold } from 'lucide-react';
+import { Clock, CalendarDays, Calendar, CalendarRange, CalendarFold } from 'lucide-react';
 import type { ViewMode } from '../../lib/dateRanges';
 
 const modes: { mode: ViewMode; label: string; Icon: typeof CalendarDays }[] = [
+  { mode: 'day', label: 'Day', Icon: Clock },
   { mode: 'week', label: 'Week', Icon: CalendarDays },
   { mode: 'month', label: 'Month', Icon: Calendar },
   { mode: 'quarter', label: 'Quarter', Icon: CalendarRange },

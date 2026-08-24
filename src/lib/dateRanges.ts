@@ -1,6 +1,6 @@
 import { toLocalDateString } from './dateUtils';
 
-export type ViewMode = 'week' | 'month' | 'quarter' | 'year';
+export type ViewMode = 'day' | 'week' | 'month' | 'quarter' | 'year';
 
 export interface DateBucket {
   key: string;
@@ -71,6 +71,9 @@ export function yearMonthBuckets(anchor: Date): DateBucket[] {
 }
 
 export function periodLabel(mode: ViewMode, anchor: Date, weekDays?: { date: string }[]): string {
+  if (mode === 'day') {
+    return anchor.toLocaleDateString('en-AU', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' });
+  }
   if (mode === 'week' && weekDays) {
     const first = new Date(weekDays[0].date + 'T00:00:00');
     const last = new Date(weekDays[weekDays.length - 1].date + 'T00:00:00');
@@ -90,9 +93,17 @@ export function periodLabel(mode: ViewMode, anchor: Date, weekDays?: { date: str
 
 export function shiftAnchor(mode: ViewMode, anchor: Date, direction: 1 | -1): Date {
   const next = new Date(anchor);
-  if (mode === 'week') next.setDate(next.getDate() + direction * 7);
+  if (mode === 'day') next.setDate(next.getDate() + direction);
+  else if (mode === 'week') next.setDate(next.getDate() + direction * 7);
   else if (mode === 'month') next.setMonth(next.getMonth() + direction);
   else if (mode === 'quarter') next.setMonth(next.getMonth() + direction * 3);
   else next.setFullYear(next.getFullYear() + direction);
   return next;
+}
+
+const DAY_LABELS_FULL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+/** Single-day "week" for the Day view — same {date,label} shape as weekOf(). */
+export function dayOf(anchor: Date): { date: string; label: string }[] {
+  return [{ date: toLocalDateString(anchor), label: DAY_LABELS_FULL[anchor.getDay()] }];
 }

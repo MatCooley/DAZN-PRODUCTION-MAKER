@@ -8,6 +8,7 @@ export function ResourceRow({
   conflictIds,
   weekStartMs,
   pxPerHour,
+  dayCount,
   checkValid,
   onDrop,
   onClickEvent,
@@ -17,12 +18,13 @@ export function ResourceRow({
   conflictIds: Set<string>;
   weekStartMs: number;
   pxPerHour: number;
+  dayCount: number;
   checkValid: (event: FacilityEvent, start: Date, end: Date) => boolean;
   onDrop: (id: string, start: Date, end: Date, valid: boolean) => void;
   onClickEvent: (event: FacilityEvent) => void;
 }) {
   const dayWidth = 24 * pxPerHour;
-  const weekWidth = 7 * dayWidth;
+  const trackWidth = dayCount * dayWidth;
 
   function pxFor(iso: string) {
     const hoursFromStart = (new Date(iso).getTime() - weekStartMs) / 3_600_000;
@@ -37,8 +39,8 @@ export function ResourceRow({
       >
         <span className="truncate text-[12px] font-medium text-[var(--text-primary)]">{resource.name}</span>
       </div>
-      <div className="relative shrink-0" style={{ width: weekWidth, height: ROW_HEIGHT }}>
-        {Array.from({ length: 7 }).map((_, i) => (
+      <div className="relative shrink-0" style={{ width: trackWidth, height: ROW_HEIGHT }}>
+        {Array.from({ length: dayCount }).map((_, i) => (
           <div
             key={i}
             className="absolute bottom-0 top-0 border-l border-[var(--line)]/40"

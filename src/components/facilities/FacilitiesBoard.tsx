@@ -13,6 +13,7 @@ import {
   yearMonthBuckets,
   periodLabel,
   shiftAnchor,
+  dayOf,
 } from '../../lib/dateRanges';
 import { TimeRuler } from './TimeRuler';
 import { ResourceRow } from './ResourceRow';
@@ -23,7 +24,7 @@ import { RoleSwitcher } from './RoleSwitcher';
 import { NotificationBell } from './NotificationBell';
 import { ShowMakerWizard } from './ShowMakerWizard';
 import { statusColor } from '../../lib/visuals';
-import { DEFAULT_PX_PER_HOUR, MIN_PX_PER_HOUR, MAX_PX_PER_HOUR } from '../../lib/facilityVisuals';
+import { DEFAULT_PX_PER_HOUR, MIN_PX_PER_HOUR, MAX_PX_PER_HOUR_WEEK, MAX_PX_PER_HOUR_DAY } from '../../lib/facilityVisuals';
 
 let reqSeq = 0;
 const newRequestId = () => `cr-${++reqSeq}`;
@@ -46,10 +47,13 @@ export function FacilitiesBoard() {
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [wizardOpen, setWizardOpen] = useState(false);
 
-  // Fit exactly 7 days into the visible width so the whole week is
+  // Fit the visible days into the visible width so the whole period is
   // visible without horizontal scrolling by default — recomputed on
-  // resize. Falls back to DEFAULT_PX_PER_HOUR (and normal scrolling)
-  // if the window is too narrow to keep hours legible.
+  // resize and when switching between Day/Week. Falls back to
+  // DEFAULT_PX_PER_HOUR (and normal scrolling) if the window is too
+  // narrow to keep hours legible. A small safety margin is subtracted
+  // from the raw measurement so sub-pixel rounding across many day
+  // columns can never clip the last day out of view.
   const scrollRef = useRef<HTMLDivElement>(null);
   const [pxPerHour, setPxPerHour] = useState(DEFAULT_PX_PER_HOUR);
 
@@ -57,11 +61,14 @@ export function FacilitiesBoard() {
     const el = scrollRef.current;
     if (!el) return;
     const LABEL_COLUMN_WIDTH = 200;
+    const SAFETY_MARGIN = 24;
+    const daysToFit = viewMode === 'day' ? 1 : 7;
+    const maxPxPerHour = viewMode === 'day' ? MAX_PX_PER_HOUR_DAY : MAX_PX_PER_HOUR_WEEK;
 
     function recalc() {
-      const available = el!.clientWidth - LABEL_COLUMN_WIDTH;
-      const fit = available / (7 * 24);
-      setPxPerHour(Math.min(MAX_PX_PER_HOUR, Math.max(MIN_PX_PER_HOUR, fit)));
+      const available = el!.clientWidth - LABEL_COLUMN_WIDTH - SAFETY_MARGIN;
+      const fit = available / (daysToFit * 24);
+      setPxPerHour(Math.min(maxPxPerHour, Math.max(MIN_PX_PER_HOUR, fit)));
     }
 
     recalc();
@@ -70,7 +77,7 @@ export function FacilitiesBoard() {
     return () => ro.disconnect();
   }, [viewMode]);
 
-  const days = useMemo(() => weekOf(anchor), [anchor]);
+  const days = useMemo(() => (viewMode === 'day' ? dayOf(anchor) : weekOf(anchor)), [anchor, viewMode]);
   const weekStartMs = useMemo(() => new Date(`${days[0].date}T00:00:00`).getTime(), [days]);
 
   const buckets: DateBucket[] = useMemo(() => {
@@ -285,7 +292,10 @@ export function FacilitiesBoard() {
     [selected, changeRequests]
   );
 
-  const isOnDemoPeriod = viewMode === 'week' && days[0].date === weekOf(DEMO_ANCHOR)[0].date;
+  const demoWeekDates = useMemo(() => new Set(weekOf(DEMO_ANCHOR).map((d) => d.date)), []);
+  const isOnDemoPeriod =
+    (viewMode === 'week' && days[0].date === weekOf(DEMO_ANCHOR)[0].date) ||
+    (viewMode === 'day' && demoWeekDates.has(days[0].date));
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
@@ -346,7 +356,7 @@ export function FacilitiesBoard() {
         </div>
       </div>
 
-      {viewMode === 'week' ? (
+      {viewMode === 'week' || viewMode === 'day' ? (
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto" onClick={() => setSelected(null)}>
           <div className="inline-block min-w-full">
             <div className="sticky top-0 z-20 flex bg-[var(--panel)]">
@@ -361,6 +371,7 @@ export function FacilitiesBoard() {
                 conflictIds={conflictedIds}
                 weekStartMs={weekStartMs}
                 pxPerHour={pxPerHour}
+                dayCount={days.length}
                 checkValid={checkValid}
                 onDrop={handleDrop}
                 onClickEvent={(ev) => setSelected(ev)}
