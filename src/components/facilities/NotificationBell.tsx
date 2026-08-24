@@ -55,15 +55,17 @@ export function NotificationBell({
           </p>
           <div className="max-h-[280px] space-y-1.5 overflow-y-auto">
             {pending.map((r) => {
-              const event = eventsById.get(r.targetEventId);
+              const event = r.targetEventId ? eventsById.get(r.targetEventId) : undefined;
+              const displayTitle = event?.title ?? r.proposedTitle ?? 'Unknown';
               const requester = usersById.get(r.requestedById);
               return (
                 <div key={r.id} className="rounded-md border border-[var(--line)] bg-[var(--panel)] p-2">
                   <p className="truncate text-[11.5px] font-medium text-[var(--text-primary)]">
-                    {event?.title ?? 'Unknown event'}
+                    {r.requestType === 'CREATE' ? '+ ' : ''}
+                    {displayTitle}
                   </p>
                   <p className="text-[10px] text-[var(--text-muted)]">
-                    {requester?.name ?? 'Unknown'} proposed {fmt(r.proposedStart)}
+                    {requester?.name ?? 'Unknown'} {r.requestType === 'CREATE' ? 'proposed creating a booking at' : 'proposed'} {fmt(r.proposedStart)}
                   </p>
                   {r.reason && <p className="mt-0.5 text-[10px] italic text-[var(--text-muted)]">"{r.reason}"</p>}
                   {!r.wasValidAtRequestTime && (

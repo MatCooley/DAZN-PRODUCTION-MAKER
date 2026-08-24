@@ -53,7 +53,8 @@ export interface SimUser {
 
 export interface ChangeRequest {
   id: string;
-  targetEventId: string;
+  requestType: 'MOVE' | 'CREATE';
+  targetEventId?: string; // set for MOVE
   requestedById: string;
   proposedStart: string;
   proposedEnd: string;
@@ -62,4 +63,11 @@ export interface ChangeRequest {
   wasValidAtRequestTime: boolean;
   createdAt: string;
   reviewedById?: string;
+  // Populated for CREATE requests — everything needed to actually build
+  // the new booking(s) on approval.
+  proposedResourceIds?: string[];
+  proposedTitle?: string;
+  proposedProduction?: string;
+  proposedClient?: string;
+  proposedShowKey?: string;
 }

@@ -36,6 +36,27 @@ export function computeConflicts(events: FacilityEvent[]): ConflictMap {
   return map;
 }
 
+// For a NEW booking (no existing event to exclude) spanning one or more
+// resources (e.g. a Studio A CR+Floor pair). Returns which existing
+// event titles would block it, if any, so the wizard/UI can show why.
+export function checkResourcesFree(
+  resourceIds: string[],
+  start: Date,
+  end: Date,
+  events: FacilityEvent[]
+): { free: boolean; blockedBy: string[] } {
+  const blockedBy: string[] = [];
+  for (const resourceId of resourceIds) {
+    const onResource = events.filter((e) => e.resourceId === resourceId && e.isBlocking && e.status !== 'CANCELLED');
+    for (const e of onResource) {
+      if (overlaps(new Date(e.start), new Date(e.end), start, end)) {
+        blockedBy.push(e.title ?? e.eventType);
+      }
+    }
+  }
+  return { free: blockedBy.length === 0, blockedBy };
+}
+
 // Mirrors is_resource_available(): bookable AND inside an availability
 // window AND no blocking event overlaps — an empty cell is never
 // enough on its own.

@@ -1,15 +1,28 @@
 import type { FacilityEvent, Resource, ResourceDependency } from './facilityTypes';
 
-export const weekStartISO = '2026-08-24T00:00:00'; // Monday
-export const weekDays = [
-  { date: '2026-08-24', label: 'Mon' },
-  { date: '2026-08-25', label: 'Tue' },
-  { date: '2026-08-26', label: 'Wed' },
-  { date: '2026-08-27', label: 'Thu' },
-  { date: '2026-08-28', label: 'Fri' },
-  { date: '2026-08-29', label: 'Sat' },
-  { date: '2026-08-30', label: 'Sun' },
-];
+export const weekStartISO = '2026-08-24T00:00:00'; // Monday — default/demo week
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+// Generates a Mon–Sun week (7 days) starting from the Monday on/after
+// (or the Monday of the week containing) the given date. Used so the
+// Gantt can navigate to any week, not just the hardcoded demo week —
+// month/year context comes from these dates, not a fixed label.
+export function weekOf(anyDateInWeek: Date): { date: string; label: string }[] {
+  const d = new Date(anyDateInWeek);
+  const dow = d.getDay(); // 0 = Sun
+  const mondayOffset = dow === 0 ? -6 : 1 - dow;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() + mondayOffset);
+  monday.setHours(0, 0, 0, 0);
+
+  return Array.from({ length: 7 }, (_, i) => {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + i);
+    return { date: day.toISOString().slice(0, 10), label: DAY_LABELS[day.getDay()] };
+  });
+}
+
+export const weekDays = weekOf(new Date(weekStartISO));
 
 export const resources: Resource[] = [
   { id: 'r-a-cr', code: 'ST_A_CR', name: 'Studio A — Control Room', group: 'Studios', order: 1, isBookable: true },
@@ -24,6 +37,13 @@ export const resourceDependencies: ResourceDependency[] = [
   { primaryResourceId: 'r-a-fl', dependentResourceId: 'r-a-cr', type: 'REQUIRES' },
   { primaryResourceId: 'r-b-fl', dependentResourceId: 'r-b-cr', type: 'REQUIRES' },
 ];
+
+export const studioResourceMap: Record<string, string[]> = {
+  A: ['r-a-cr', 'r-a-fl'],
+  B: ['r-b-cr', 'r-b-fl'],
+  C: ['r-c-cr'],
+  D: ['r-d-cr'],
+};
 
 let seq = 0;
 const id = () => `fe-${++seq}`;

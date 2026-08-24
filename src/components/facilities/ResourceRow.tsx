@@ -2,19 +2,12 @@ import type { FacilityEvent, Resource } from '../../lib/facilityTypes';
 import { PX_PER_HOUR, ROW_HEIGHT } from '../../lib/facilityVisuals';
 import { DAY_WIDTH, WEEK_WIDTH } from './TimeRuler';
 import { EventBlock } from './EventBlock';
-import { weekStartISO } from '../../lib/facilityData';
-
-const weekStartMs = new Date(weekStartISO).getTime();
-
-function pxFor(iso: string) {
-  const hoursFromStart = (new Date(iso).getTime() - weekStartMs) / 3_600_000;
-  return hoursFromStart * PX_PER_HOUR;
-}
 
 export function ResourceRow({
   resource,
   events,
   conflictIds,
+  weekStartMs,
   checkValid,
   onDrop,
   onClickEvent,
@@ -22,10 +15,16 @@ export function ResourceRow({
   resource: Resource;
   events: FacilityEvent[];
   conflictIds: Set<string>;
+  weekStartMs: number;
   checkValid: (event: FacilityEvent, start: Date, end: Date) => boolean;
   onDrop: (id: string, start: Date, end: Date, valid: boolean) => void;
   onClickEvent: (event: FacilityEvent) => void;
 }) {
+  function pxFor(iso: string) {
+    const hoursFromStart = (new Date(iso).getTime() - weekStartMs) / 3_600_000;
+    return hoursFromStart * PX_PER_HOUR;
+  }
+
   return (
     <div className="flex border-b border-[var(--line)]/70">
       <div
