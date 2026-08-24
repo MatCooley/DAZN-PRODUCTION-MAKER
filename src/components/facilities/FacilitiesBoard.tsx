@@ -40,6 +40,7 @@ const DEMO_ANCHOR = new Date(weekStartISO);
 export function FacilitiesBoard() {
   const [events, setEvents] = useState<FacilityEvent[]>(initialFacilityEvents);
   const [selected, setSelected] = useState<FacilityEvent | null>(null);
+  const [selectedAnchor, setSelectedAnchor] = useState<DOMRect | null>(null);
   const [currentUser, setCurrentUser] = useState<SimUser>(simUsers[0]);
   const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
   const [toast, setToast] = useState<string | null>(null);
@@ -387,7 +388,10 @@ export function FacilitiesBoard() {
                 dayCount={days.length}
                 checkValid={checkValid}
                 onDrop={handleDrop}
-                onClickEvent={(ev) => setSelected(ev)}
+                onClickEvent={(ev, rect) => {
+                  setSelected(ev);
+                  setSelectedAnchor(rect);
+                }}
               />
             ))}
           </div>
@@ -409,7 +413,11 @@ export function FacilitiesBoard() {
           resourceName={resourcesById.get(selected.resourceId)?.name ?? selected.resourceId}
           conflicts={selectedConflicts}
           pendingRequest={selectedPendingRequest}
-          onClose={() => setSelected(null)}
+          anchorRect={selectedAnchor}
+          onClose={() => {
+            setSelected(null);
+            setSelectedAnchor(null);
+          }}
         />
       )}
 

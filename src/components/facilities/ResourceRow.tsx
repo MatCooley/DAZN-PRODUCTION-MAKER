@@ -21,7 +21,7 @@ export function ResourceRow({
   dayCount: number;
   checkValid: (event: FacilityEvent, start: Date, end: Date) => boolean;
   onDrop: (id: string, start: Date, end: Date, valid: boolean) => void;
-  onClickEvent: (event: FacilityEvent) => void;
+  onClickEvent: (event: FacilityEvent, anchorRect: DOMRect) => void;
 }) {
   const dayWidth = 24 * pxPerHour;
   const trackWidth = dayCount * dayWidth;

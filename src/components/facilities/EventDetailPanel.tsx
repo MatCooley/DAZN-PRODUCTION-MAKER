@@ -21,20 +21,43 @@ export function EventDetailPanel({
   resourceName,
   conflicts,
   pendingRequest,
+  anchorRect,
   onClose,
 }: {
   event: FacilityEvent;
   resourceName: string;
   conflicts: FacilityEvent[];
   pendingRequest?: ChangeRequest;
+  anchorRect: DOMRect | null;
   onClose: () => void;
 }) {
   const style = facilityEventStyle[event.eventType];
   const show = event.showKey ? showLibrary.find((s) => s.key === event.showKey) : undefined;
   const currency = (n: number) => `$${n.toLocaleString('en-AU', { maximumFractionDigits: 0 })}`;
 
+  // Anchor the panel next to the clicked block, flipping to whichever
+  // side has room, and clamping so it never renders off-screen —
+  // rather than always parking in a fixed corner regardless of where
+  // you actually clicked.
+  const PANEL_WIDTH = 300;
+  const MARGIN = 10;
+  let left: number;
+  let top: number;
+  if (anchorRect) {
+    const preferRight = anchorRect.right + MARGIN + PANEL_WIDTH <= window.innerWidth;
+    left = preferRight ? anchorRect.right + MARGIN : anchorRect.left - PANEL_WIDTH - MARGIN;
+    left = Math.max(MARGIN, Math.min(left, window.innerWidth - PANEL_WIDTH - MARGIN));
+    top = Math.max(MARGIN, Math.min(anchorRect.top, window.innerHeight - MARGIN - 120));
+  } else {
+    left = window.innerWidth - PANEL_WIDTH - 16;
+    top = 16;
+  }
+
   return (
-    <div className="absolute right-3 top-3 z-30 w-[300px] rounded-lg border border-[var(--line)] bg-[var(--panel-raised)] p-3.5 shadow-xl">
+    <div
+      className="fixed z-30 w-[300px] rounded-lg border border-[var(--line)] bg-[var(--panel-raised)] p-3.5 shadow-2xl"
+      style={{ left, top, maxHeight: 'calc(100vh - 20px)', overflowY: 'auto' }}
+    >
       <div className="mb-2 flex items-start justify-between gap-2">
         <div className="flex items-center gap-2">
           <span className="h-2 w-2 rounded-full" style={{ backgroundColor: style.border }} />

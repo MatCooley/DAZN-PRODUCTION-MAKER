@@ -26,18 +26,19 @@ export function EventBlock({
   bookingColor: { fill: string; border: string; textColor: string };
   checkValid: (start: Date, end: Date) => boolean;
   onDrop: (id: string, start: Date, end: Date, valid: boolean) => void;
-  onClick: (event: FacilityEvent) => void;
+  onClick: (event: FacilityEvent, anchorRect: DOMRect) => void;
 }) {
   const [drag, setDrag] = useState<{ deltaPx: number; valid: boolean } | null>(null);
   const moved = useRef(0);
   const draggable = DRAGGABLE_TYPES.has(event.eventType);
 
-  function handleMouseDown(e: React.MouseEvent) {
+  function handleMouseDown(e: React.MouseEvent<HTMLDivElement>) {
     if (!draggable) return;
     e.preventDefault();
     const startClientX = e.clientX;
     const origStart = new Date(event.start);
     const origEnd = new Date(event.end);
+    const anchorRect = e.currentTarget.getBoundingClientRect();
     moved.current = 0;
 
     function handleMove(ev: MouseEvent) {
@@ -57,7 +58,7 @@ export function EventBlock({
 
       if (moved.current < CLICK_THRESHOLD_PX) {
         setDrag(null);
-        onClick(event);
+        onClick(event, anchorRect);
         return;
       }
 
@@ -92,7 +93,7 @@ export function EventBlock({
     <div
       onMouseDown={handleMouseDown}
       onClick={(e) => {
-        if (isAvailability) onClick(event);
+        if (isAvailability) onClick(event, e.currentTarget.getBoundingClientRect());
         e.stopPropagation();
       }}
       className={`absolute top-1.5 flex items-center gap-1 overflow-hidden rounded-[4px] border px-1.5 transition-shadow
