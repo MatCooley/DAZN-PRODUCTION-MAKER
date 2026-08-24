@@ -4,8 +4,19 @@ import { resources, initialFacilityEvents, weekOf, weekStartISO } from '../../li
 import type { ChangeRequest, FacilityEvent, SimUser } from '../../lib/facilityTypes';
 import { computeConflicts, overlaps, checkResourcesFree } from '../../lib/facilityLogic';
 import { canEditDirectly, simUsers } from '../../lib/users';
+import {
+  type ViewMode,
+  type DateBucket,
+  monthDayBuckets,
+  quarterDayBuckets,
+  yearMonthBuckets,
+  periodLabel,
+  shiftAnchor,
+} from '../../lib/dateRanges';
 import { TimeRuler } from './TimeRuler';
 import { ResourceRow } from './ResourceRow';
+import { DensityGrid } from './DensityGrid';
+import { ViewModeSwitcher } from './ViewModeSwitcher';
 import { EventDetailPanel } from './EventDetailPanel';
 import { RoleSwitcher } from './RoleSwitcher';
 import { NotificationBell } from './NotificationBell';
@@ -19,7 +30,7 @@ const newEventId = () => `fe-new-${++evSeq}`;
 let linkSeq = 0;
 const newLinkId = () => `link-new-${++linkSeq}`;
 
-const DEMO_WEEK_ANCHOR = new Date(weekStartISO);
+const DEMO_ANCHOR = new Date(weekStartISO);
 
 export function FacilitiesBoard() {
   const [events, setEvents] = useState<FacilityEvent[]>(initialFacilityEvents);
@@ -27,11 +38,21 @@ export function FacilitiesBoard() {
   const [currentUser, setCurrentUser] = useState<SimUser>(simUsers[0]);
   const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
   const [toast, setToast] = useState<string | null>(null);
-  const [weekAnchor, setWeekAnchor] = useState<Date>(DEMO_WEEK_ANCHOR);
+  const [anchor, setAnchor] = useState<Date>(DEMO_ANCHOR);
+  const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [wizardOpen, setWizardOpen] = useState(false);
 
-  const days = useMemo(() => weekOf(weekAnchor), [weekAnchor]);
+  const days = useMemo(() => weekOf(anchor), [anchor]);
   const weekStartMs = useMemo(() => new Date(`${days[0].date}T00:00:00`).getTime(), [days]);
+
+  const buckets: DateBucket[] = useMemo(() => {
+    if (viewMode === 'month') return monthDayBuckets(anchor);
+    if (viewMode === 'quarter') return quarterDayBuckets(anchor);
+    if (viewMode === 'year') return yearMonthBuckets(anchor);
+    return [];
+  }, [viewMode, anchor]);
+
+  const cellWidth = viewMode === 'month' ? 30 : viewMode === 'quarter' ? 11 : 72;
 
   const conflicts = useMemo(() => computeConflicts(events), [events]);
   const resourcesById = useMemo(() => new Map(resources.map((r) => [r.id, r])), []);
@@ -43,12 +64,6 @@ export function FacilitiesBoard() {
   function showToast(msg: string) {
     setToast(msg);
     window.setTimeout(() => setToast((cur) => (cur === msg ? null : cur)), 3500);
-  }
-
-  function shiftWeek(deltaWeeks: number) {
-    const next = new Date(weekAnchor);
-    next.setDate(next.getDate() + deltaWeeks * 7);
-    setWeekAnchor(next);
   }
 
   function checkValid(event: FacilityEvent, start: Date, end: Date): boolean {
@@ -229,6 +244,16 @@ export function FacilitiesBoard() {
     );
   }
 
+  function handleBucketClick(bucket: DateBucket) {
+    if (viewMode === 'year') {
+      setAnchor(bucket.start);
+      setViewMode('month');
+    } else {
+      setAnchor(bucket.start);
+      setViewMode('week');
+    }
+  }
+
   const selectedConflicts = useMemo(() => {
     if (!selected) return [];
     const ids = conflicts[selected.id] ?? [];
@@ -240,39 +265,41 @@ export function FacilitiesBoard() {
     [selected, changeRequests]
   );
 
-  const isCurrentWeekDemoWeek = days[0].date === weekOf(DEMO_WEEK_ANCHOR)[0].date;
+  const isOnDemoPeriod = viewMode === 'week' && days[0].date === weekOf(DEMO_ANCHOR)[0].date;
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-      <div className="flex items-center justify-between border-b border-[var(--line)] bg-[var(--panel)]/60 px-4 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-y-2 border-b border-[var(--line)] bg-[var(--panel)]/60 px-4 py-2">
         <div className="flex items-center gap-2">
           <button
-            onClick={() => shiftWeek(-1)}
+            onClick={() => setAnchor((a) => shiftAnchor(viewMode, a, -1))}
             className="flex h-6 w-6 items-center justify-center rounded border border-[var(--line)] text-[var(--text-muted)] hover:border-[var(--tally)]/60 hover:text-[var(--text-primary)]"
-            aria-label="Previous week"
+            aria-label="Previous period"
           >
             <ChevronLeft size={13} />
           </button>
           <button
-            onClick={() => shiftWeek(1)}
+            onClick={() => setAnchor((a) => shiftAnchor(viewMode, a, 1))}
             className="flex h-6 w-6 items-center justify-center rounded border border-[var(--line)] text-[var(--text-muted)] hover:border-[var(--tally)]/60 hover:text-[var(--text-primary)]"
-            aria-label="Next week"
+            aria-label="Next period"
           >
             <ChevronRight size={13} />
           </button>
-          {!isCurrentWeekDemoWeek && (
+          <span className="ml-1 font-display text-[13px] font-semibold uppercase tracking-wide text-[var(--tally)]">
+            {periodLabel(viewMode, anchor, days)}
+          </span>
+          <ViewModeSwitcher mode={viewMode} onChange={setViewMode} />
+          {!isOnDemoPeriod && (
             <button
-              onClick={() => setWeekAnchor(DEMO_WEEK_ANCHOR)}
+              onClick={() => {
+                setAnchor(DEMO_ANCHOR);
+                setViewMode('week');
+              }}
               className="flex items-center gap-1 rounded border border-[var(--line)] px-2 py-1 font-mono text-[9.5px] text-[var(--text-muted)] hover:border-[var(--tally)]/60 hover:text-[var(--text-primary)]"
             >
               <CalendarClock size={11} /> Jump to bookings
             </button>
           )}
-          <p className="ml-1 text-[11px] text-[var(--text-muted)]">
-            {canEditDirectly(currentUser.accessLevel)
-              ? 'Drag to reschedule, or add a new booking. Click any block for details.'
-              : "Note-only access — dragging or creating proposes a change for a supervisor to approve."}
-          </p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -299,26 +326,37 @@ export function FacilitiesBoard() {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-auto" onClick={() => setSelected(null)}>
-        <div className="inline-block min-w-full">
-          <div className="sticky top-0 z-20 flex bg-[var(--panel)]">
-            <div className="sticky left-0 z-30 w-[200px] shrink-0 border-b border-r border-[var(--line)] bg-[var(--panel)]" />
-            <TimeRuler days={days} />
+      {viewMode === 'week' ? (
+        <div className="min-h-0 flex-1 overflow-auto" onClick={() => setSelected(null)}>
+          <div className="inline-block min-w-full">
+            <div className="sticky top-0 z-20 flex bg-[var(--panel)]">
+              <div className="sticky left-0 z-30 w-[200px] shrink-0 border-b border-r border-[var(--line)] bg-[var(--panel)]" />
+              <TimeRuler days={days} />
+            </div>
+            {resources.map((r) => (
+              <ResourceRow
+                key={r.id}
+                resource={r}
+                events={events.filter((e) => e.resourceId === r.id && days.some((d) => e.start.startsWith(d.date)))}
+                conflictIds={conflictedIds}
+                weekStartMs={weekStartMs}
+                checkValid={checkValid}
+                onDrop={handleDrop}
+                onClickEvent={(ev) => setSelected(ev)}
+              />
+            ))}
           </div>
-          {resources.map((r) => (
-            <ResourceRow
-              key={r.id}
-              resource={r}
-              events={events.filter((e) => e.resourceId === r.id && days.some((d) => e.start.startsWith(d.date)))}
-              conflictIds={conflictedIds}
-              weekStartMs={weekStartMs}
-              checkValid={checkValid}
-              onDrop={handleDrop}
-              onClickEvent={(ev) => setSelected(ev)}
-            />
-          ))}
         </div>
-      </div>
+      ) : (
+        <DensityGrid
+          resources={resources}
+          buckets={buckets}
+          events={events}
+          conflictedIds={conflictedIds}
+          cellWidth={cellWidth}
+          onCellClick={handleBucketClick}
+        />
+      )}
 
       {selected && (
         <EventDetailPanel
