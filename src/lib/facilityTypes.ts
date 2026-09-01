@@ -72,7 +72,7 @@ export interface BookingDraft {
 
 export interface ChangeRequest {
   id: string;
-  requestType: 'MOVE' | 'CREATE';
+  requestType: 'MOVE' | 'CREATE' | 'EDIT';
   targetEventId?: string; // set for MOVE
   requestedById: string;
   proposedStart: string;

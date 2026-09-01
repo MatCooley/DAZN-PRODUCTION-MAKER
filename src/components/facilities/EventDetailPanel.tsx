@@ -1,4 +1,4 @@
-import { X, Link2, Repeat, Users } from 'lucide-react';
+import { X, Link2, Repeat, Users, Pencil } from 'lucide-react';
 import type { ChangeRequest, FacilityEvent } from '../../lib/facilityTypes';
 import { facilityEventLabel, facilityEventStyle } from '../../lib/facilityVisuals';
 import { showLibrary } from '../../lib/showLibrary';
@@ -22,6 +22,8 @@ export function EventDetailPanel({
   conflicts,
   pendingRequest,
   anchorRect,
+  isNoteOnly,
+  onEdit,
   onClose,
 }: {
   event: FacilityEvent;
@@ -29,6 +31,8 @@ export function EventDetailPanel({
   conflicts: FacilityEvent[];
   pendingRequest?: ChangeRequest;
   anchorRect: DOMRect | null;
+  isNoteOnly: boolean;
+  onEdit: () => void;
   onClose: () => void;
 }) {
   const style = facilityEventStyle[event.eventType];
@@ -65,9 +69,20 @@ export function EventDetailPanel({
             {facilityEventLabel[event.eventType]}
           </span>
         </div>
-        <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]" aria-label="Close">
-          <X size={14} />
-        </button>
+        <div className="flex items-center gap-1">
+          {event.eventType === 'BOOKING' && event.status !== 'CANCELLED' && (
+            <button
+              onClick={onEdit}
+              title={isNoteOnly ? 'Propose an edit' : 'Edit booking'}
+              className="flex items-center gap-1 rounded px-1.5 py-0.5 font-mono text-[9.5px] text-[var(--tally)] hover:bg-[var(--tally)]/15"
+            >
+              <Pencil size={11} /> {isNoteOnly ? 'Propose edit' : 'Edit'}
+            </button>
+          )}
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]" aria-label="Close">
+            <X size={14} />
+          </button>
+        </div>
       </div>
 
       <h3 className="mb-2 font-display text-[15px] font-semibold text-[var(--text-primary)]">

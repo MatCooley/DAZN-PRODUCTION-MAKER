@@ -23,8 +23,17 @@ import { EventDetailPanel } from './EventDetailPanel';
 import { RoleSwitcher } from './RoleSwitcher';
 import { NotificationBell } from './NotificationBell';
 import { ShowMakerWizard } from './ShowMakerWizard';
+import { EditBookingModal } from './EditBookingModal';
 import { statusColor } from '../../lib/visuals';
-import { DEFAULT_PX_PER_HOUR, MIN_PX_PER_HOUR, MAX_PX_PER_HOUR_WEEK, MAX_PX_PER_HOUR_DAY, studioAccentColor } from '../../lib/facilityVisuals';
+import {
+  DEFAULT_PX_PER_HOUR,
+  MIN_PX_PER_HOUR,
+  MAX_PX_PER_HOUR_WEEK,
+  MAX_PX_PER_HOUR_DAY,
+  studioAccentColor,
+  studioLetterOf,
+  resourceKindOf,
+} from '../../lib/facilityVisuals';
 
 let reqSeq = 0;
 const newRequestId = () => `cr-${++reqSeq}`;
@@ -47,6 +56,7 @@ export function FacilitiesBoard() {
   const [anchor, setAnchor] = useState<Date>(DEMO_ANCHOR);
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<FacilityEvent | null>(null);
 
   // Fit the visible days into the visible width so the whole period is
   // visible without horizontal scrolling by default — recomputed on
@@ -158,6 +168,116 @@ export function FacilitiesBoard() {
     }
   }
 
+  // All events sharing a linkedBookingSetId with the given event (or just
+  // itself if it isn't linked) — the "instance" being edited as one unit.
+  function groupOf(event: FacilityEvent): FacilityEvent[] {
+    if (!event.linkedBookingSetId) return [event];
+    return events.filter((e) => e.linkedBookingSetId === event.linkedBookingSetId);
+  }
+
+  // Derives the current "Where" (studio + CR/Floor/Both) selection for an
+  // event, so the edit modal can open pre-filled with what's actually booked.
+  function studioAndSelectionFor(event: FacilityEvent): { studio: string; selection: 'BOTH' | 'CR' | 'FL' } {
+    const resource = resourcesById.get(event.resourceId);
+    const studio = resource ? studioLetterOf(resource.code) : '';
+    const group = groupOf(event);
+    if (group.length > 1) return { studio, selection: 'BOTH' };
+    const kind = resource ? resourceKindOf(resource.code) : '?';
+    return { studio, selection: kind === 'FL' ? 'FL' : 'CR' };
+  }
+
+  function commitEdit(originalGroup: FacilityEvent[], draft: BookingDraft, newResourceIds: string[]) {
+    const start = new Date(`${draft.date}T${draft.startTime}:00`);
+    const end = new Date(start.getTime() + draft.durationHours * 3_600_000);
+    const oldIds = new Set(originalGroup.map((e) => e.resourceId));
+    const newIds = new Set(newResourceIds);
+    const sameResourceSet = oldIds.size === newIds.size && [...oldIds].every((id) => newIds.has(id));
+    const primary = originalGroup[0];
+
+    if (sameResourceSet) {
+      // Simple in-place update — same resource(s), just fields/time changed.
+      setEvents((prev) =>
+        prev.map((e) =>
+          originalGroup.some((o) => o.id === e.id)
+            ? {
+                ...e,
+                title: draft.title,
+                production: draft.production || undefined,
+                client: draft.client || undefined,
+                start: toLocalDateTimeString(start),
+                end: toLocalDateTimeString(end),
+                isModifiedOccurrence: e.seriesId ? true : e.isModifiedOccurrence,
+              }
+            : e
+        )
+      );
+    } else {
+      // The studio/CR-Floor target changed — remove the old group and
+      // create fresh events for the new resource set, carrying over
+      // showKey/seriesId/bookingGroupId from the original booking.
+      const linkId = newResourceIds.length > 1 ? newLinkId() : undefined;
+      const replacement: FacilityEvent[] = newResourceIds.map((resourceId) => ({
+        id: newEventId(),
+        resourceId,
+        eventType: 'BOOKING',
+        isBlocking: true,
+        start: toLocalDateTimeString(start),
+        end: toLocalDateTimeString(end),
+        status: 'CONFIRMED',
+        title: draft.title,
+        production: draft.production || undefined,
+        client: draft.client || undefined,
+        showKey: primary.showKey,
+        seriesId: primary.seriesId,
+        isModifiedOccurrence: primary.seriesId ? true : primary.isModifiedOccurrence,
+        bookingGroupId: primary.bookingGroupId,
+        linkedBookingSetId: linkId,
+      }));
+      const removeIds = new Set(originalGroup.map((e) => e.id));
+      setEvents((prev) => [...prev.filter((e) => !removeIds.has(e.id)), ...replacement]);
+    }
+    showToast(`Saved changes to "${draft.title}"`);
+  }
+
+  function handleEditSubmit(draft: BookingDraft, resourceIds: string[]) {
+    if (!editingEvent) return;
+    const originalGroup = groupOf(editingEvent);
+    const start = new Date(`${draft.date}T${draft.startTime}:00`);
+    const end = new Date(start.getTime() + draft.durationHours * 3_600_000);
+    const excludeIds = new Set(originalGroup.map((e) => e.id));
+    const otherEvents = events.filter((e) => !excludeIds.has(e.id));
+    const freeCheck = checkResourcesFree(resourceIds, start, end, otherEvents);
+
+    if (canEditDirectly(currentUser.accessLevel)) {
+      if (!freeCheck.free) {
+        showToast(`Save blocked — conflicts with ${freeCheck.blockedBy.join(', ')}`);
+        return;
+      }
+      commitEdit(originalGroup, draft, resourceIds);
+      setEditingEvent(null);
+      setSelected(null);
+      return;
+    }
+
+    const request: ChangeRequest = {
+      id: newRequestId(),
+      requestType: 'EDIT',
+      targetEventId: originalGroup[0].id,
+      requestedById: currentUser.id,
+      proposedStart: toLocalDateTimeString(start),
+      proposedEnd: toLocalDateTimeString(end),
+      status: 'PENDING',
+      wasValidAtRequestTime: freeCheck.free,
+      createdAt: new Date().toISOString(),
+      proposedResourceIds: resourceIds,
+      proposedDraft: draft,
+    };
+    setChangeRequests((prev) => [...prev, request]);
+    showToast(`Edit to "${draft.title}" proposed — awaiting approval`);
+    setEditingEvent(null);
+    setSelected(null);
+  }
+
   function handleDrop(id: string, start: Date, end: Date, valid: boolean) {
     const event = eventsById.get(id);
     if (!event) return;
@@ -259,6 +379,12 @@ export function FacilitiesBoard() {
       const newEvents = buildEventsForDraft(req.proposedDraft, req.proposedResourceIds);
       setEvents((prev) => [...prev, ...newEvents]);
       showToast(`Approved and created "${req.proposedDraft.title}" (${newEvents.length / req.proposedResourceIds.length} occurrence${newEvents.length / req.proposedResourceIds.length === 1 ? '' : 's'})`);
+    } else if (req.requestType === 'EDIT' && req.targetEventId && req.proposedResourceIds && req.proposedDraft) {
+      const target = eventsById.get(req.targetEventId);
+      if (target) {
+        const originalGroup = groupOf(target);
+        commitEdit(originalGroup, req.proposedDraft, req.proposedResourceIds);
+      }
     }
 
     setChangeRequests((prev) =>
@@ -414,12 +540,33 @@ export function FacilitiesBoard() {
           conflicts={selectedConflicts}
           pendingRequest={selectedPendingRequest}
           anchorRect={selectedAnchor}
+          isNoteOnly={!canEditDirectly(currentUser.accessLevel)}
+          onEdit={() => setEditingEvent(selected)}
           onClose={() => {
             setSelected(null);
             setSelectedAnchor(null);
           }}
         />
       )}
+
+      {editingEvent &&
+        (() => {
+          const { studio, selection } = studioAndSelectionFor(editingEvent);
+          return (
+            <EditBookingModal
+              event={editingEvent}
+              studio={studio}
+              selection={selection}
+              isNoteOnly={!canEditDirectly(currentUser.accessLevel)}
+              checkFree={(resourceIds, start, end) => {
+                const excludeIds = new Set(groupOf(editingEvent).map((e) => e.id));
+                return checkResourcesFree(resourceIds, start, end, events.filter((e) => !excludeIds.has(e.id)));
+              }}
+              onClose={() => setEditingEvent(null)}
+              onSubmit={handleEditSubmit}
+            />
+          );
+        })()}
 
       {wizardOpen && (
         <ShowMakerWizard

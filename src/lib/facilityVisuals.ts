@@ -52,6 +52,12 @@ export function studioLetterOf(code: string): string {
   return code.match(/^ST_([A-Z])_/)?.[1] ?? '?';
 }
 
+export function resourceKindOf(code: string): 'CR' | 'FL' | '?' {
+  if (code.endsWith('_CR')) return 'CR';
+  if (code.endsWith('_FL')) return 'FL';
+  return '?';
+}
+
 export function studioColorFor(code: string) {
   return studioAccentColor[studioLetterOf(code)] ?? studioAccentFallback;
 }

@@ -32,33 +32,38 @@ export const resources: Resource[] = [
   { id: 'r-b-cr', code: 'ST_B_CR', name: 'Studio B — Control Room', group: 'Studios', order: 3, isBookable: true },
   { id: 'r-b-fl', code: 'ST_B_FL', name: 'Studio B — Floor', group: 'Studios', order: 4, isBookable: true },
   { id: 'r-c-cr', code: 'ST_C_CR', name: 'Studio C — Control Room', group: 'Studios', order: 5, isBookable: true },
-  { id: 'r-d-cr', code: 'ST_D_CR', name: 'Studio D — Control Room', group: 'Studios', order: 6, isBookable: true },
+  { id: 'r-c-fl', code: 'ST_C_FL', name: 'Studio C — Floor', group: 'Studios', order: 6, isBookable: true },
+  { id: 'r-d-fl', code: 'ST_D_FL', name: 'Studio D — Floor', group: 'Studios', order: 7, isBookable: true },
 ];
 
 export const resourceDependencies: ResourceDependency[] = [
   { primaryResourceId: 'r-a-fl', dependentResourceId: 'r-a-cr', type: 'REQUIRES' },
   { primaryResourceId: 'r-b-fl', dependentResourceId: 'r-b-cr', type: 'REQUIRES' },
+  { primaryResourceId: 'r-c-fl', dependentResourceId: 'r-c-cr', type: 'REQUIRES' },
 ];
 
-export const studioResourceMap: Record<string, string[]> = {
-  A: ['r-a-cr', 'r-a-fl'],
-  B: ['r-b-cr', 'r-b-fl'],
-  C: ['r-c-cr'],
-  D: ['r-d-cr'],
+export const studioResourceMap: Record<string, { cr?: string; fl?: string }> = {
+  A: { cr: 'r-a-cr', fl: 'r-a-fl' },
+  B: { cr: 'r-b-cr', fl: 'r-b-fl' },
+  C: { cr: 'r-c-cr', fl: 'r-c-fl' },
+  D: { fl: 'r-d-fl' },
 };
 
 export type ResourceSelection = 'BOTH' | 'CR' | 'FL';
 
-/** Resolves a studio letter + CR/Floor/Both selection into actual resource ids.
- * For studios with only a Control Room (C, D), selection is ignored. */
+/** Resolves a studio letter + CR/Floor/Both selection into actual resource
+ * ids. If a studio only has one of the two (e.g. Studio D — Floor only),
+ * that single resource is returned regardless of selection. */
 export function resolveBookingResourceIds(studio: string, selection: ResourceSelection): string[] {
-  const ids = studioResourceMap[studio];
-  if (!ids) return [];
-  const [cr, fl] = ids;
-  if (!fl) return [cr]; // no Floor resource for this studio — always just the Control Room
-  if (selection === 'CR') return [cr];
-  if (selection === 'FL') return [fl];
-  return [cr, fl];
+  const entry = studioResourceMap[studio];
+  if (!entry) return [];
+  const { cr, fl } = entry;
+  if (cr && fl) {
+    if (selection === 'CR') return [cr];
+    if (selection === 'FL') return [fl];
+    return [cr, fl];
+  }
+  return cr ? [cr] : fl ? [fl] : [];
 }
 
 export interface BookingTargetOption {
@@ -74,13 +79,15 @@ export interface BookingTargetOption {
 export function bookingTargetOptions(): BookingTargetOption[] {
   const options: BookingTargetOption[] = [];
   for (const studio of Object.keys(studioResourceMap)) {
-    const ids = studioResourceMap[studio];
-    if (ids.length > 1) {
+    const { cr, fl } = studioResourceMap[studio];
+    if (cr && fl) {
       options.push({ value: `${studio}|BOTH`, studio, selection: 'BOTH', label: `Studio ${studio} — Control Room + Floor` });
       options.push({ value: `${studio}|CR`, studio, selection: 'CR', label: `Studio ${studio} — Control Room only` });
       options.push({ value: `${studio}|FL`, studio, selection: 'FL', label: `Studio ${studio} — Floor only` });
-    } else {
+    } else if (cr) {
       options.push({ value: `${studio}|BOTH`, studio, selection: 'BOTH', label: `Studio ${studio} — Control Room` });
+    } else if (fl) {
+      options.push({ value: `${studio}|BOTH`, studio, selection: 'BOTH', label: `Studio ${studio} — Floor` });
     }
   }
   return options;
@@ -130,11 +137,11 @@ export const initialFacilityEvents: FacilityEvent[] = [
   { id: id(), resourceId: 'r-c-cr', eventType: 'MAINTENANCE', isBlocking: true, start: '2026-08-25T10:00:00', end: '2026-08-25T12:00:00', status: 'CONFIRMED', title: 'Scheduled desk maintenance' },
 
   // --- Studio D: Matty Johns Podcast, Mon 09:00–10:00 (pre-record) ---
-  { id: id(), resourceId: 'r-d-cr', eventType: 'BOOKING', isBlocking: true, start: '2026-08-24T09:00:00', end: '2026-08-24T10:00:00', status: 'CONFIRMED', title: 'Matty Johns Podcast', production: 'Matty Johns Podcast', showKey: 'matty-johns-podcast' },
-  { id: id(), resourceId: 'r-d-cr', eventType: 'AVAILABILITY_WINDOW', isBlocking: false, start: '2026-08-24T10:00:00', end: '2026-08-28T00:00:00', status: 'CONFIRMED' },
-  { id: id(), resourceId: 'r-d-cr', eventType: 'BLACKOUT', isBlocking: true, start: '2026-08-26T20:00:00', end: '2026-08-27T02:00:00', status: 'CONFIRMED', title: 'Power infrastructure works' },
+  { id: id(), resourceId: 'r-d-fl', eventType: 'BOOKING', isBlocking: true, start: '2026-08-24T09:00:00', end: '2026-08-24T10:00:00', status: 'CONFIRMED', title: 'Matty Johns Podcast', production: 'Matty Johns Podcast', showKey: 'matty-johns-podcast' },
+  { id: id(), resourceId: 'r-d-fl', eventType: 'AVAILABILITY_WINDOW', isBlocking: false, start: '2026-08-24T10:00:00', end: '2026-08-28T00:00:00', status: 'CONFIRMED' },
+  { id: id(), resourceId: 'r-d-fl', eventType: 'BLACKOUT', isBlocking: true, start: '2026-08-26T20:00:00', end: '2026-08-27T02:00:00', status: 'CONFIRMED', title: 'Power infrastructure works' },
   // Deliberate conflict for demo purposes: a hold that clashes with the blackout above
-  { id: id(), resourceId: 'r-d-cr', eventType: 'HOLD', isBlocking: true, start: '2026-08-26T21:00:00', end: '2026-08-26T23:00:00', status: 'HELD', title: 'Tentative hold — future promo shoot' },
+  { id: id(), resourceId: 'r-d-fl', eventType: 'HOLD', isBlocking: true, start: '2026-08-26T21:00:00', end: '2026-08-26T23:00:00', status: 'HELD', title: 'Tentative hold — future promo shoot' },
 
   // --- Studio A: Matty Johns Late Show Thu, NRL Off Tube Call + Sunday Matty Johns Show ---
   ...linkedPair('r-a-cr', 'r-a-fl', 'link-a-thu', {
