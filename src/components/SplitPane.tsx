@@ -1,4 +1,5 @@
 import { useRef, useState, type ReactNode } from 'react';
+import { GripHorizontal } from 'lucide-react';
 
 export function SplitPane({
   top,
@@ -44,16 +45,20 @@ export function SplitPane({
         {top}
       </div>
 
+      {/* The handle sits flush against both panes — no gap either side —
+          so it reads as physically joining them rather than a stray line
+          floating between two separate blocks. */}
       <div
         onMouseDown={handleMouseDown}
         onDoubleClick={() => setTopPct(defaultTopPct)}
-        title="Drag to resize · double-click to reset"
-        className="group relative z-10 h-[7px] shrink-0 cursor-row-resize border-y border-[var(--line)] bg-[var(--panel)]"
+        title="Drag to resize Studios / Roster · double-click to reset"
+        className={`group relative z-20 flex h-[10px] shrink-0 cursor-row-resize items-center justify-center border-y bg-[var(--panel)] transition-colors ${
+          dragging ? 'border-[var(--tally)] bg-[var(--tally)]/20' : 'border-[var(--line)] hover:bg-[var(--tally)]/10'
+        }`}
       >
-        <div
-          className={`absolute left-1/2 top-1/2 h-[3px] w-12 -translate-x-1/2 -translate-y-1/2 rounded-full transition ${
-            dragging ? 'bg-[var(--tally)]' : 'bg-[var(--line)] group-hover:bg-[var(--tally)]/70'
-          }`}
+        <GripHorizontal
+          size={16}
+          className={`transition-colors ${dragging ? 'text-[var(--tally)]' : 'text-[var(--text-muted)] group-hover:text-[var(--tally)]'}`}
         />
       </div>
 
