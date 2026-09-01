@@ -35,9 +35,10 @@ export function ResourceRow({
   return (
     <div className="flex border-b border-[var(--line)]/70">
       <div
-        className="sticky left-0 z-10 flex w-[200px] shrink-0 items-center border-r border-[var(--line)] bg-[var(--panel)] px-3"
-        style={{ height: ROW_HEIGHT }}
+        className="sticky left-0 z-10 flex w-[200px] shrink-0 items-center gap-2 border-r border-[var(--line)] bg-[var(--panel)] pl-3 pr-3"
+        style={{ height: ROW_HEIGHT, borderLeft: `3px solid ${bookingColor.border}` }}
       >
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: bookingColor.border }} />
         <span className="truncate text-[12px] font-medium text-[var(--text-primary)]">{resource.name}</span>
       </div>
       <div className="relative shrink-0" style={{ width: trackWidth, height: ROW_HEIGHT }}>
