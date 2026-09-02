@@ -2,6 +2,7 @@ import { X, Link2, Repeat, Users, Pencil } from 'lucide-react';
 import type { ChangeRequest, FacilityEvent } from '../../lib/facilityTypes';
 import { facilityEventLabel, facilityEventStyle } from '../../lib/facilityVisuals';
 import { showLibrary } from '../../lib/showLibrary';
+import { skillLabel } from '../../lib/visuals';
 import { toLocalDateString } from '../../lib/dateUtils';
 
 function fmt(iso: string) {
@@ -37,6 +38,9 @@ export function EventDetailPanel({
 }) {
   const style = facilityEventStyle[event.eventType];
   const show = event.showKey ? showLibrary.find((s) => s.key === event.showKey) : undefined;
+  const excludedCrewRoles = event.excludedCrewRoles ?? [];
+  const bookingCrew = show ? show.crew.filter((c) => !excludedCrewRoles.includes(c.role)) : [];
+  const bookingCrewCost = bookingCrew.reduce((n, c) => n + c.totalCost, 0);
   const currency = (n: number) => `$${n.toLocaleString('en-AU', { maximumFractionDigits: 0 })}`;
 
   // Anchor the panel next to the clicked block, flipping to whichever
@@ -143,9 +147,9 @@ export function EventDetailPanel({
           </p>
           <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
             <span className="text-[var(--text-muted)]">Crew this booking</span>
-            <span className="text-right text-[var(--text-primary)]">{show.crew.reduce((n, c) => n + c.count, 0)} people</span>
+            <span className="text-right text-[var(--text-primary)]">{bookingCrew.reduce((n, c) => n + c.count, 0)} people</span>
             <span className="text-[var(--text-muted)]">Booking cost</span>
-            <span className="text-right text-[var(--text-primary)]">{currency(show.totalCrewCost)}</span>
+            <span className="text-right text-[var(--text-primary)]">{currency(bookingCrewCost)}</span>
             {show.episodes != null && (
               <>
                 <span className="text-[var(--text-muted)]">Episodes / season</span>
@@ -160,12 +164,38 @@ export function EventDetailPanel({
             )}
           </div>
           <div className="max-h-[110px] space-y-0.5 overflow-y-auto rounded-md bg-[var(--panel)] p-1.5">
-            {show.crew.map((c, i) => (
+            {bookingCrew.map((c, i) => (
               <div key={i} className="flex justify-between text-[10px]">
                 <span className="text-[var(--text-muted)]">
                   {c.count > 1 ? `${c.count}× ` : ''}{c.role}
                 </span>
                 <span className="font-mono text-[var(--text-primary)]">{currency(c.totalCost)}</span>
+              </div>
+            ))}
+          </div>
+          {excludedCrewRoles.length > 0 && (
+            <p className="font-mono text-[9.5px] text-[var(--text-muted)]">
+              {excludedCrewRoles.length} role{excludedCrewRoles.length === 1 ? '' : 's'} not needed for this booking: {excludedCrewRoles.join(', ')}
+            </p>
+          )}
+        </div>
+      )}
+
+      {!show && event.customCrew && event.customCrew.length > 0 && (
+        <div className="mt-3 space-y-2 border-t border-[var(--line)] pt-2.5">
+          <p className="font-mono text-[9.5px] uppercase tracking-wide text-[var(--tally)]">Crew needed</p>
+          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-[11px]">
+            <span className="text-[var(--text-muted)]">Crew this booking</span>
+            <span className="text-right text-[var(--text-primary)]">
+              {event.customCrew.reduce((n, c) => n + c.count, 0)} people
+            </span>
+          </div>
+          <div className="max-h-[110px] space-y-0.5 overflow-y-auto rounded-md bg-[var(--panel)] p-1.5">
+            {event.customCrew.map((c, i) => (
+              <div key={i} className="flex justify-between text-[10px]">
+                <span className="text-[var(--text-muted)]">
+                  {c.count > 1 ? `${c.count}× ` : ''}{skillLabel[c.skill]}
+                </span>
               </div>
             ))}
           </div>

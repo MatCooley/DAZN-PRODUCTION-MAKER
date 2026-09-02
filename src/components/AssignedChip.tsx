@@ -29,12 +29,16 @@ export function AssignedChip({
       }}
       title={flags.map((f) => f.label).join(' • ')}
     >
-      <span
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[9px] font-semibold text-[var(--ink)]"
-        style={{ backgroundColor: color }}
-      >
-        {employee.initials}
-      </span>
+      {employee.photo ? (
+        <img src={employee.photo} alt={employee.name} className="h-5 w-5 shrink-0 rounded-full object-cover" />
+      ) : (
+        <span
+          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[9px] font-semibold text-[var(--ink)]"
+          style={{ backgroundColor: color }}
+        >
+          {employee.initials}
+        </span>
+      )}
       <span className="truncate text-[11px] leading-none text-[var(--text-primary)]">
         {employee.name.split(' ')[0]}
       </span>

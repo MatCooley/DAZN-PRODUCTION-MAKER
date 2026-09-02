@@ -35,11 +35,17 @@ export function ResourceRow({
   return (
     <div className="flex border-b border-[var(--line)]/70">
       <div
-        className="sticky left-0 z-10 flex w-[200px] shrink-0 items-center gap-2 border-r border-[var(--line)] bg-[var(--panel)] pl-3 pr-3"
-        style={{ height: ROW_HEIGHT, borderLeft: `3px solid ${bookingColor.border}` }}
+        className="sticky left-0 z-10 flex w-[200px] shrink-0 items-center gap-2 border-r border-[var(--line)] pl-3 pr-3"
+        style={{
+          height: ROW_HEIGHT,
+          borderLeft: `4px solid ${bookingColor.border}`,
+          backgroundColor: `${bookingColor.border}1f`,
+        }}
       >
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: bookingColor.border }} />
-        <span className="truncate text-[12px] font-medium text-[var(--text-primary)]">{resource.name}</span>
+        <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: bookingColor.border }} />
+        <span className="truncate text-[12px] font-semibold text-white">
+          {resource.name}
+        </span>
       </div>
       <div className="relative shrink-0" style={{ width: trackWidth, height: ROW_HEIGHT }}>
         {Array.from({ length: dayCount }).map((_, i) => (

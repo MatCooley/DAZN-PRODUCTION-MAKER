@@ -22,6 +22,8 @@ function draftFromEvent(event: FacilityEvent, studio: string, selection: 'BOTH' 
     client: event.client ?? '',
     repeatDays: [],
     repeatWeeks: 1,
+    excludedCrewRoles: event.excludedCrewRoles ?? [],
+    customCrew: event.customCrew ?? [],
   };
 }
 

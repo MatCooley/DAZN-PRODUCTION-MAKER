@@ -76,11 +76,13 @@ export function DensityGrid({
         {resources.map((r) => (
           <div key={r.id} className="flex border-b border-[var(--line)]/70">
             <div
-              className="sticky left-0 z-10 flex h-9 w-[200px] shrink-0 items-center gap-2 border-r border-[var(--line)] bg-[var(--panel)] pl-3 pr-3"
-              style={{ borderLeft: `3px solid ${studioColorFor(r.code).border}` }}
+              className="sticky left-0 z-10 flex h-9 w-[200px] shrink-0 items-center gap-2 border-r border-[var(--line)] pl-3 pr-3"
+              style={{ borderLeft: `4px solid ${studioColorFor(r.code).border}`, backgroundColor: `${studioColorFor(r.code).border}1f` }}
             >
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: studioColorFor(r.code).border }} />
-              <span className="truncate text-[11.5px] font-medium text-[var(--text-primary)]">{r.name}</span>
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: studioColorFor(r.code).border }} />
+              <span className="truncate text-[11.5px] font-semibold text-white">
+                {r.name}
+              </span>
             </div>
             {buckets.map((b) => {
               const cell = bucketStatus(r.id, b, events, conflictedIds);

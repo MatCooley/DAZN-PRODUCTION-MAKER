@@ -2,6 +2,8 @@
 // Used both to populate realistic bookings on the Studios Gantt and to show
 // actual crew cost when a booking is clicked.
 
+import type { SkillCode } from './types';
+
 export interface ShowCrewLine {
   role: string;
   rate: number;
@@ -44,3 +46,34 @@ export const showLibrary: ShowTemplate[] = [
   { key: "nrl-sideline", name: "NRL Sideline", studio: null, notes: ["NRL Sideline"], crew: [{ role: "Make Up", rate: 65, count: 1, shiftHours: 4, totalCost: 240 }], totalCrewCost: 0, episodes: null, seriesCost: null },
   { key: "nrl-tonight", name: "NRL Tonight", studio: null, notes: ["NRL Tonight"], crew: [{ role: "Make Up", rate: 65, count: 1, shiftHours: 4, totalCost: 240 }], totalCrewCost: 0, episodes: null, seriesCost: null },
 ];
+
+export function showTemplateByKey(key: string): ShowTemplate | undefined {
+  return showLibrary.find((s) => s.key === key);
+}
+
+// Maps a crew line's role name (as it appears in Studio_Staff_cost.xlsx)
+// onto the roster's SkillCode taxonomy — the two vocabularies were built
+// to match 1:1, so this is a straight lookup, not a fuzzy translation.
+const ROLE_TO_SKILL_CODE: Record<string, SkillCode> = {
+  DA: 'DA',
+  'VIZ Op': 'VIZ',
+  PA: 'PA',
+  Switcher: 'SW',
+  'Floor Manager': 'FM',
+  'Technical Director': 'TD',
+  'Stedicam Op': 'STEADI',
+  Director: 'DIR',
+  'Lighting Director': 'LD',
+  'Make Up': 'MU',
+  Staging: 'STG',
+  Wardrobe: 'WARD',
+  'Camera Operator': 'CAM',
+  'Audio Director': 'AUD',
+  'Audio Assistant': 'AUDA',
+  'EVS Operator': 'EVS',
+  'JIB Operator': 'JIB',
+};
+
+export function skillCodeForRole(role: string): SkillCode | undefined {
+  return ROLE_TO_SKILL_CODE[role];
+}

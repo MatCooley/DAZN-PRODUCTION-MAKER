@@ -25,6 +25,8 @@ import { NotificationBell } from './NotificationBell';
 import { ShowMakerWizard } from './ShowMakerWizard';
 import { EditBookingModal } from './EditBookingModal';
 import { statusColor } from '../../lib/visuals';
+import { buildDerivedShifts } from '../../lib/derivedShifts';
+import type { Shift } from '../../lib/types';
 import {
   DEFAULT_PX_PER_HOUR,
   MIN_PX_PER_HOUR,
@@ -34,6 +36,8 @@ import {
   studioLetterOf,
   resourceKindOf,
 } from '../../lib/facilityVisuals';
+
+const WEEKDAY_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 let reqSeq = 0;
 const newRequestId = () => `cr-${++reqSeq}`;
@@ -46,7 +50,13 @@ const newSeriesId = () => `series-new-${++seriesSeq}`;
 
 const DEMO_ANCHOR = new Date(weekStartISO);
 
-export function FacilitiesBoard() {
+export function FacilitiesBoard({
+  onVisibleWeekChange,
+  onDerivedShiftsChange,
+}: {
+  onVisibleWeekChange?: (weekDays: { date: string; label: string }[]) => void;
+  onDerivedShiftsChange?: (shifts: Shift[]) => void;
+}) {
   const [events, setEvents] = useState<FacilityEvent[]>(initialFacilityEvents);
   const [selected, setSelected] = useState<FacilityEvent | null>(null);
   const [selectedAnchor, setSelectedAnchor] = useState<DOMRect | null>(null);
@@ -90,6 +100,21 @@ export function FacilitiesBoard() {
 
   const days = useMemo(() => (viewMode === 'day' ? dayOf(anchor) : weekOf(anchor)), [anchor, viewMode]);
   const weekStartMs = useMemo(() => new Date(`${days[0].date}T00:00:00`).getTime(), [days]);
+
+  // Keep the Roster panel's visible week in sync with whatever week this
+  // board is showing — only meaningful in week/day view, since month/
+  // quarter/year don't map to a single 7-day roster window.
+  useEffect(() => {
+    if (viewMode !== 'week' && viewMode !== 'day') return;
+    onVisibleWeekChange?.(weekOf(anchor));
+  }, [anchor, viewMode, onVisibleWeekChange]);
+
+  // Any confirmed booking that references a real show template turns into
+  // a roster shift with real crew requirements — recomputed whenever
+  // bookings change, independent of which week is currently in view.
+  useEffect(() => {
+    onDerivedShiftsChange?.(buildDerivedShifts(events));
+  }, [events, onDerivedShiftsChange]);
 
   const buckets: DateBucket[] = useMemo(() => {
     if (viewMode === 'month') return monthDayBuckets(anchor);
@@ -228,6 +253,8 @@ export function FacilitiesBoard() {
         production: draft.production || undefined,
         client: draft.client || undefined,
         showKey: primary.showKey,
+        excludedCrewRoles: primary.excludedCrewRoles,
+        customCrew: primary.customCrew,
         seriesId: primary.seriesId,
         isModifiedOccurrence: primary.seriesId ? true : primary.isModifiedOccurrence,
         bookingGroupId: primary.bookingGroupId,
@@ -312,6 +339,10 @@ export function FacilitiesBoard() {
     const newEvents: FacilityEvent[] = [];
     for (const occ of occurrences) {
       const linkId = resourceIds.length > 1 ? newLinkId() : undefined;
+      // A show booked across more than one weekday (e.g. Mon/Tue/Wed) gets
+      // each occurrence's weekday appended — "NRL 360" -> "NRL 360 Mon" —
+      // same convention as the day-suffixed shows already in showLibrary.
+      const occTitle = draft.repeatDays.length > 1 ? `${draft.title} ${WEEKDAY_LABEL[occ.start.getDay()]}` : draft.title;
       for (const resourceId of resourceIds) {
         newEvents.push({
           id: newEventId(),
@@ -321,10 +352,12 @@ export function FacilitiesBoard() {
           start: toLocalDateTimeString(occ.start),
           end: toLocalDateTimeString(occ.end),
           status: 'CONFIRMED',
-          title: draft.title,
+          title: occTitle,
           production: draft.production || undefined,
           client: draft.client || undefined,
           showKey: draft.template?.key,
+          excludedCrewRoles: draft.excludedCrewRoles.length > 0 ? draft.excludedCrewRoles : undefined,
+          customCrew: !draft.template && draft.customCrew.length > 0 ? draft.customCrew : undefined,
           linkedBookingSetId: linkId,
           seriesId,
         });

@@ -1,21 +1,46 @@
 import { useMemo, useState } from 'react';
 import type { Employee, SkillCode } from '../lib/types';
-import { skillColor, skillLabel } from '../lib/visuals';
+import { allSkillCodes, skillLabel } from '../lib/visuals';
 import { EmployeeChip } from './EmployeeChip';
 
-export function Sidebar({ employees, assignedCounts }: { employees: Employee[]; assignedCounts: Record<string, number> }) {
+export function Sidebar({
+  employees,
+  assignedCounts,
+  onEditEmployee,
+}: {
+  employees: Employee[];
+  assignedCounts: Record<string, number>;
+  onEditEmployee?: (employee: Employee) => void;
+}) {
   const [query, setQuery] = useState('');
+  const [roleFilter, setRoleFilter] = useState<SkillCode | 'ALL'>('ALL');
+  // Managers only ever work their own team's roster (like the PDF Rach
+  // sends her team), so default to the single team present rather than
+  // an unscoped "All teams" view — "All teams" stays available for once
+  // more than one manager's staff live in the same roster.
+  const [managerTeamFilter, setManagerTeamFilter] = useState<string>(() => {
+    const teams = Array.from(new Set(employees.map((e) => e.team)));
+    return teams.length === 1 ? teams[0] : 'ALL';
+  });
 
-  const groups = useMemo(() => {
-    const bySkill = new Map<SkillCode, Employee[]>();
+  const managerTeams = useMemo(
+    () => Array.from(new Set(employees.map((e) => e.team))).sort(),
+    [employees],
+  );
+
+  const gradeGroups = useMemo(() => {
+    const byGrade = new Map<string, Employee[]>();
     for (const emp of employees) {
       if (query && !emp.name.toLowerCase().includes(query.toLowerCase())) continue;
-      const list = bySkill.get(emp.primarySkill) ?? [];
+      if (roleFilter !== 'ALL' && !emp.skills.includes(roleFilter)) continue;
+      if (managerTeamFilter !== 'ALL' && emp.team !== managerTeamFilter) continue;
+      const list = byGrade.get(emp.grade) ?? [];
       list.push(emp);
-      bySkill.set(emp.primarySkill, list);
+      byGrade.set(emp.grade, list);
     }
-    return Array.from(bySkill.entries());
-  }, [employees, query]);
+    const order = ['Permanent', 'Freelance'];
+    return order.filter((grade) => byGrade.has(grade)).map((grade) => [grade, byGrade.get(grade)!] as const);
+  }, [employees, query, roleFilter, managerTeamFilter]);
 
   return (
     <aside className="flex h-full w-[248px] shrink-0 flex-col border-r border-[var(--line)] bg-[var(--panel)]/60">
@@ -29,23 +54,51 @@ export function Sidebar({ employees, assignedCounts }: { employees: Employee[]; 
           placeholder="Filter by name…"
           className="mt-2 w-full rounded-md border border-[var(--line)] bg-[var(--ink)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:border-[var(--tally)]"
         />
-      </div>
-      <div className="flex-1 space-y-4 overflow-y-auto p-3">
-        {groups.map(([skill, list]) => (
-          <div key={skill}>
-            <div className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-[var(--text-muted)]">
-              <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: skillColor[skill] }} />
+        <select
+          value={managerTeamFilter}
+          onChange={(e) => setManagerTeamFilter(e.target.value)}
+          className="mt-1.5 w-full rounded-md border border-[var(--line)] bg-[var(--ink)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] focus:border-[var(--tally)]"
+        >
+          <option value="ALL">All teams</option>
+          {managerTeams.map((team) => (
+            <option key={team} value={team}>
+              {team}
+            </option>
+          ))}
+        </select>
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value as SkillCode | 'ALL')}
+          className="mt-1.5 w-full rounded-md border border-[var(--line)] bg-[var(--ink)] px-2.5 py-1.5 text-[12px] text-[var(--text-primary)] focus:border-[var(--tally)]"
+        >
+          <option value="ALL">All roles</option>
+          {allSkillCodes.map((skill) => (
+            <option key={skill} value={skill}>
               {skillLabel[skill]}
-            </div>
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="flex-1 space-y-5 overflow-y-auto p-3">
+        {gradeGroups.map(([grade, list]) => (
+          <div key={grade}>
+            <h3 className="mb-2 font-display text-[11px] font-semibold uppercase tracking-wide text-[var(--text-primary)]">
+              {grade}
+            </h3>
             <div className="space-y-1.5">
               {list.map((emp) => (
-                <EmployeeChip key={emp.id} employee={emp} dimmed={(assignedCounts[emp.id] ?? 0) > 0 && false} />
+                <EmployeeChip
+                  key={emp.id}
+                  employee={emp}
+                  dimmed={(assignedCounts[emp.id] ?? 0) > 0 && false}
+                  onEdit={onEditEmployee}
+                />
               ))}
             </div>
           </div>
         ))}
-        {groups.length === 0 && (
-          <p className="text-[12px] text-[var(--text-muted)]">No operators match "{query}".</p>
+        {gradeGroups.length === 0 && (
+          <p className="text-[12px] text-[var(--text-muted)]">No operators match the current filters.</p>
         )}
       </div>
       <div className="border-t border-[var(--line)] p-3 text-[10.5px] leading-snug text-[var(--text-muted)]">

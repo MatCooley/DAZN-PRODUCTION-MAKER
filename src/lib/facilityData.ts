@@ -109,8 +109,67 @@ function linkedPair(
     { id: id(), resourceId: flResourceId, linkedBookingSetId: linkId, ...common },
   ];
 }
-void linkedPair; // available for reuse when seeding real bookings again
 
-// Clean slate — no seeded bookings. Add real bookings via the "+ New
-// booking" wizard, or ask Claude to populate them from a data source.
-export const initialFacilityEvents: FacilityEvent[] = [];
+let bookingSeq = 0;
+const newBookingLinkId = () => `link-seed-${++bookingSeq}`;
+
+interface SeedBooking {
+  studio: 'A' | 'B' | 'C';
+  title: string;
+  showKey?: string;
+  start: string; // 'YYYY-MM-DDTHH:mm:ss'
+  end: string;
+}
+
+// Real bookings parsed from the FoxSports DA/PA/VIZ roster PDF
+// (pmg_rosterdapaviz_r_we_sept_20.pdf), matched against showLibrary by
+// name. Only the w/c 24 Aug and 31 Aug weeks are included — those are the
+// only two where the scanned table's day-of-week alignment could be
+// confirmed with confidence (either from an explicit day in the show
+// name, e.g. "NRL Friday Night Footy", or a same-day cross-reference
+// between two staff rows sharing the same RLG/GEN booking number).
+// Weeks of 7 Sep and 14 Sep (NRL Finals ramp-up — QUAL/ELIMS fixtures)
+// were left out rather than guessed at.
+const seedBookings: SeedBooking[] = [
+  // w/c 24 Aug 2026
+  { studio: 'C', title: 'NRL 360', showKey: 'nrl-360-mon', start: '2026-08-24T13:00:00', end: '2026-08-24T20:00:00' },
+  { studio: 'C', title: 'NRL 360', showKey: 'nrl-360-tue', start: '2026-08-25T16:00:00', end: '2026-08-25T20:00:00' },
+  { studio: 'C', title: 'NRL 360', showKey: 'nrl-360-wed', start: '2026-08-26T13:00:00', end: '2026-08-26T19:30:00' },
+  { studio: 'B', title: 'NRL Thursday (Thurs Night League)', showKey: 'thurs-night-league', start: '2026-08-27T17:00:00', end: '2026-08-27T22:30:00' },
+  { studio: 'A', title: 'NRLW 2025 Hostings', start: '2026-08-27T16:00:00', end: '2026-08-27T19:00:00' },
+  { studio: 'A', title: 'Matty Johns Late Show Thursday', showKey: 'matty-johns-late-show-thursday', start: '2026-08-27T19:00:00', end: '2026-08-27T23:00:00' },
+  { studio: 'B', title: 'NRL Friday Night Footy', showKey: 'nrl-friday-night-footy', start: '2026-08-28T14:00:00', end: '2026-08-28T23:00:00' },
+  { studio: 'B', title: 'Sportsbet', showKey: 'sportsbet-nrl-wagering-fri', start: '2026-08-28T08:30:00', end: '2026-08-28T12:30:00' },
+  { studio: 'B', title: 'NRL Super Saturday', showKey: 'nrl-super-saturday', start: '2026-08-29T15:00:00', end: '2026-08-29T23:00:00' },
+  { studio: 'A', title: 'Sunday Matty Johns Show', showKey: 'sunday-matty-johns-show', start: '2026-08-30T15:30:00', end: '2026-08-30T19:30:00' },
+
+  // w/c 31 Aug 2026
+  { studio: 'C', title: 'NRL 360', showKey: 'nrl-360-mon', start: '2026-08-31T12:00:00', end: '2026-08-31T20:00:00' },
+  { studio: 'A', title: 'NRLW 2025 Hostings', start: '2026-09-03T16:00:00', end: '2026-09-03T19:00:00' },
+  { studio: 'A', title: 'Matty Johns Late Show Thursday', showKey: 'matty-johns-late-show-thursday', start: '2026-09-03T19:00:00', end: '2026-09-03T23:00:00' },
+  { studio: 'B', title: 'NRL Thursday (Thurs Night League)', showKey: 'thurs-night-league', start: '2026-09-03T16:30:00', end: '2026-09-03T22:30:00' },
+  { studio: 'B', title: 'NRL Friday Night Footy', showKey: 'nrl-friday-night-footy', start: '2026-09-04T14:00:00', end: '2026-09-04T23:30:00' },
+  { studio: 'B', title: 'Sportsbet', showKey: 'sportsbet-nrl-wagering-fri', start: '2026-09-04T08:30:00', end: '2026-09-04T12:30:00' },
+  { studio: 'B', title: 'NRL Super Saturday (x3 games)', showKey: 'nrl-super-saturday', start: '2026-09-05T12:30:00', end: '2026-09-05T23:30:00' },
+  { studio: 'A', title: 'Sunday Matty Johns Show', showKey: 'sunday-matty-johns-show', start: '2026-09-06T13:30:00', end: '2026-09-06T20:00:00' },
+];
+
+const studioCrFl: Record<'A' | 'B' | 'C', [string, string]> = {
+  A: ['r-a-cr', 'r-a-fl'],
+  B: ['r-b-cr', 'r-b-fl'],
+  C: ['r-c-cr', 'r-c-fl'],
+};
+
+export const initialFacilityEvents: FacilityEvent[] = seedBookings.flatMap((b) => {
+  const [cr, fl] = studioCrFl[b.studio];
+  return linkedPair(cr, fl, newBookingLinkId(), {
+    eventType: 'BOOKING',
+    isBlocking: true,
+    start: b.start,
+    end: b.end,
+    status: 'CONFIRMED',
+    title: b.title,
+    production: b.title,
+    showKey: b.showKey,
+  });
+});

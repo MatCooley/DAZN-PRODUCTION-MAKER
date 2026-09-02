@@ -1,10 +1,28 @@
+// Role codes as used on the real FoxSports DA/PA/VIZ roster:
+// DA = Data/Duty Assistant, VIZ = Vision graphics operator, PA = Production
+// Assistant, SW = Switcher (the DA/PA/VIZ roster often lists this combined
+// with Director as "dir/swi"). The remaining codes are the broadcast crew
+// roles used by showLibrary.ts's real per-show crew list (parsed from
+// Studio_Staff_cost.xlsx) — matched 1:1 against that sheet's role names so
+// a booking's crew list can be turned directly into roster requirements.
 export type SkillCode =
-  | 'TX'
-  | 'VISION'
-  | 'AUDIO'
+  | 'DA'
+  | 'VIZ'
+  | 'PA'
+  | 'SW'
+  | 'FM'
+  | 'TD'
+  | 'STEADI'
+  | 'DIR'
+  | 'LD'
+  | 'MU'
+  | 'STG'
+  | 'WARD'
+  | 'CAM'
+  | 'AUD'
+  | 'AUDA'
   | 'EVS'
-  | 'GFX'
-  | 'MCR';
+  | 'JIB';
 
 export interface Employee {
   id: string;
@@ -14,6 +32,8 @@ export interface Employee {
   agreement: 'BREA' | 'BARE';
   skills: SkillCode[];
   primarySkill: SkillCode;
+  photo?: string;
+  team: string; // the manager-led team this person reports into, e.g. "Rach's Team"
 }
 
 export type ShiftSlot = 'EARLY' | 'DAY' | 'LATE' | 'NIGHT';

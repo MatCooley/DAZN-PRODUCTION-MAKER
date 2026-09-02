@@ -1,26 +1,50 @@
 import { useMemo, useState } from 'react';
 import { DndContext, DragOverlay, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
-import { employees, shifts } from './lib/data';
-import type { Assignments } from './lib/types';
+import { employees as initialEmployees, shifts as staticShifts, initialAssignments, days as initialRosterDays } from './lib/data';
+import type { Assignments, Employee, Shift } from './lib/types';
 import { computeCompliance } from './lib/compliance';
 import { TopBar } from './components/TopBar';
-import { RosterToolbar } from './components/RosterToolbar';
+import { RosterToolbar, type RosterViewMode } from './components/RosterToolbar';
 import { Sidebar } from './components/Sidebar';
 import { Board } from './components/Board';
+import { RosterTable } from './components/RosterTable';
 import { EmployeeChip } from './components/EmployeeChip';
+import { EmployeeProfileModal } from './components/EmployeeProfileModal';
 import { FacilitiesBoard } from './components/facilities/FacilitiesBoard';
-import { SplitPane } from './components/SplitPane';
-
-const shiftsById = new Map(shifts.map((s) => [s.id, s]));
-const employeesById = new Map(employees.map((e) => [e.id, e]));
-
-const initialAssignments: Assignments = {};
+import { SplitPane, type SplitLayoutMode } from './components/SplitPane';
+import { LayoutModeSwitcher } from './components/LayoutModeSwitcher';
 
 export default function App() {
+  const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
   const [assignments, setAssignments] = useState<Assignments>(initialAssignments);
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
+  const [layoutMode, setLayoutMode] = useState<SplitLayoutMode>('split');
+  const [rosterViewMode, setRosterViewMode] = useState<RosterViewMode>('board');
+  const [rosterDays, setRosterDays] = useState(initialRosterDays);
+  const [derivedShifts, setDerivedShifts] = useState<Shift[]>([]);
 
-  const compliance = useMemo(() => computeCompliance(shifts, assignments, employees), [assignments]);
+  // Hand-authored shifts (real historical roster data) always win over a
+  // booking-derived one for the SAME production on the SAME day, so a real
+  // PDF-sourced shift is never overridden by a cost-sheet guess — but a
+  // new booking on a day that already has unrelated authored shifts (e.g.
+  // adding a fresh Sunday booking alongside the existing Sunday shifts)
+  // still gets its own derived shift instead of being silently dropped.
+  const shifts = useMemo(() => {
+    const authoredKeys = new Set(staticShifts.map((s) => `${s.day}::${s.production}`));
+    const extra = derivedShifts.filter((s) => !authoredKeys.has(`${s.day}::${s.production}`));
+    return [...staticShifts, ...extra];
+  }, [derivedShifts]);
+
+  const shiftsById = useMemo(() => new Map(shifts.map((s) => [s.id, s])), [shifts]);
+
+  const hasShiftsForWeek = useMemo(
+    () => shifts.some((s) => rosterDays.some((d) => d.date === s.day)),
+    [shifts, rosterDays],
+  );
+
+  const employeesById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
+  const compliance = useMemo(() => computeCompliance(shifts, assignments, employees), [shifts, assignments, employees]);
 
   const assignedCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -37,7 +61,8 @@ export default function App() {
     let required = 0;
     let breaches = 0;
     let warnings = 0;
-    for (const s of shifts) {
+    const visibleShifts = shifts.filter((s) => rosterDays.some((d) => d.date === s.day));
+    for (const s of visibleShifts) {
       const f = compliance.shiftFillSummary[s.id];
       if (f) {
         filled += f.filled;
@@ -52,7 +77,7 @@ export default function App() {
       breachCount: breaches,
       warningCount: warnings,
     };
-  }, [compliance]);
+  }, [shifts, rosterDays, compliance]);
 
   function handleDragStart(event: DragStartEvent) {
     setDraggingId(String(event.active.id));
@@ -94,6 +119,11 @@ export default function App() {
     });
   }
 
+  function handleSaveEmployee(updated: Employee) {
+    setEmployees((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+    setEditingEmployee(null);
+  }
+
   function handleRemove(shiftId: string, skill: string, employeeId: string) {
     setAssignments((prev) => {
       const shiftAssignments = prev[shiftId];
@@ -113,10 +143,13 @@ export default function App() {
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex h-screen flex-col bg-[var(--ink)]">
-        <TopBar />
+        <TopBar>
+          <LayoutModeSwitcher mode={layoutMode} onChange={setLayoutMode} />
+        </TopBar>
         <SplitPane
           defaultTopPct={55}
-          top={<FacilitiesBoard />}
+          mode={layoutMode}
+          top={<FacilitiesBoard onVisibleWeekChange={setRosterDays} onDerivedShiftsChange={setDerivedShifts} />}
           bottom={
             <div className="flex h-full min-h-0 flex-col">
               <RosterToolbar
@@ -124,23 +157,47 @@ export default function App() {
                 breachCount={breachCount}
                 warningCount={warningCount}
                 onReset={() => setAssignments({})}
+                viewMode={rosterViewMode}
+                onViewModeChange={setRosterViewMode}
               />
-              <div className="flex min-h-0 flex-1">
-                <Sidebar employees={employees} assignedCounts={assignedCounts} />
-                <div className="min-w-0 flex-1 overflow-auto">
-                  <Board
-                    assignments={assignments}
-                    employeesById={employeesById}
-                    compliance={compliance}
-                    onRemove={handleRemove}
-                  />
+              {!hasShiftsForWeek && (
+                <div className="border-b border-[var(--line)] bg-[var(--panel-raised)]/60 px-4 py-1.5 font-mono text-[10.5px] text-[var(--text-muted)]">
+                  No roster shifts published for {rosterDays[0]?.date.slice(5)} – {rosterDays[6]?.date.slice(5)} yet.
                 </div>
-              </div>
+              )}
+              {rosterViewMode === 'table' ? (
+                <RosterTable days={rosterDays} employees={employees} shifts={shifts} assignments={assignments} />
+              ) : (
+                <div className="flex min-h-0 flex-1">
+                  <Sidebar
+                    employees={employees}
+                    assignedCounts={assignedCounts}
+                    onEditEmployee={setEditingEmployee}
+                  />
+                  <div className="min-w-0 flex-1 overflow-auto">
+                    <Board
+                      days={rosterDays}
+                      shifts={shifts}
+                      assignments={assignments}
+                      employeesById={employeesById}
+                      compliance={compliance}
+                      onRemove={handleRemove}
+                    />
+                  </div>
+                </div>
+              )}
             </div>
           }
         />
       </div>
       <DragOverlay>{draggingEmployee ? <EmployeeChip employee={draggingEmployee} /> : null}</DragOverlay>
+      {editingEmployee && (
+        <EmployeeProfileModal
+          employee={editingEmployee}
+          onClose={() => setEditingEmployee(null)}
+          onSave={handleSaveEmployee}
+        />
+      )}
     </DndContext>
   );
 }

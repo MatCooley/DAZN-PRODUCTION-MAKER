@@ -50,6 +50,7 @@ export function generateOccurrences(draft: BookingDraft): { start: Date; end: Da
   const days = draft.repeatDays.length > 0 ? draft.repeatDays : [anchorDay.getDay()];
   const weeks = Math.max(1, draft.repeatWeeks);
   const monday = startOfWeekMonday(anchorDay);
+  const endBoundary = draft.endDate ? new Date(`${draft.endDate}T23:59:59`) : null;
 
   const occurrences: { start: Date; end: Date }[] = [];
   for (let w = 0; w < weeks; w++) {
@@ -58,6 +59,7 @@ export function generateOccurrences(draft: BookingDraft): { start: Date; end: Da
       const occurrenceDay = new Date(monday);
       occurrenceDay.setDate(monday.getDate() + w * 7 + offsetFromMonday);
       if (occurrenceDay.getTime() < anchorDay.getTime()) continue; // before the chosen start date
+      if (endBoundary && occurrenceDay.getTime() > endBoundary.getTime()) continue; // past the chosen end date
 
       const start = new Date(occurrenceDay);
       start.setHours(anchor.getHours(), anchor.getMinutes(), 0, 0);

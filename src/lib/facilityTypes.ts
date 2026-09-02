@@ -1,6 +1,14 @@
 import type { ShowTemplate } from './showLibrary';
+import type { SkillCode } from './types';
 
 export type FacilityEventType = 'BOOKING' | 'HOLD' | 'MAINTENANCE' | 'BLACKOUT' | 'AVAILABILITY_WINDOW';
+
+// A hand-picked crew role for a custom (no show template) booking — the
+// counterpart to ShowCrewLine for bookings with no real cost-sheet entry.
+export interface CustomCrewLine {
+  skill: SkillCode;
+  count: number;
+}
 
 export interface Resource {
   id: string;
@@ -43,6 +51,13 @@ export interface FacilityEvent {
   // Links this instance to a real show template in showLibrary.ts, so
   // the detail panel can show actual crew/cost data for this booking.
   showKey?: string;
+  // Crew role names (matching ShowCrewLine.role) turned off for this
+  // specific booking — the show template's crew list minus these is what
+  // actually gets costed, displayed, and turned into roster requirements.
+  excludedCrewRoles?: string[];
+  // Hand-picked crew for a custom (no showKey) booking — the only source
+  // of roster requirements when there's no show template to pull from.
+  customCrew?: CustomCrewLine[];
 }
 
 export type AccessLevel = 'READ_ONLY' | 'NOTE_ONLY' | 'EDIT' | 'SUPERUSER';
@@ -57,17 +72,28 @@ export interface BookingDraft {
   template: ShowTemplate | null;
   studio: string; // 'A' | 'B' | 'C' | 'D'
   resourceSelection: 'BOTH' | 'CR' | 'FL'; // which of Control Room/Floor to book — 'BOTH' when only one exists
-  date: string; // YYYY-MM-DD — first occurrence's date
+  date: string; // YYYY-MM-DD — start date / first occurrence's date
+  endDate?: string; // YYYY-MM-DD — last date the recurrence is allowed to land on
   startTime: string; // HH:mm
+  endTime?: string; // HH:mm — durationHours is derived from startTime/endTime, not entered directly
   durationHours: number;
   title: string;
   production: string;
   client: string;
   // Recurrence: which weekdays (0=Sun..6=Sat, matching Date.getDay()) this
   // booking repeats on, and for how many weeks. [] or length-1 arrays with
-  // repeatWeeks=1 behave as a one-off booking on `date` only.
+  // repeatWeeks=0 behave as a one-off booking on `date` only.
   repeatDays: number[];
   repeatWeeks: number;
+  // The actual live-to-air window within the booking (setup/rec time
+  // around it is covered by startTime/endTime).
+  liveTxStart?: string; // HH:mm
+  liveTxEnd?: string; // HH:mm
+  // Crew role names (matching ShowCrewLine.role) unchecked in the Review
+  // & crew step — excluded from cost, display, and roster requirements.
+  excludedCrewRoles: string[];
+  // Hand-picked crew for a custom (no template) booking.
+  customCrew: CustomCrewLine[];
 }
 
 export interface ChangeRequest {

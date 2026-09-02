@@ -1,17 +1,23 @@
 import { useDraggable } from '@dnd-kit/core';
+import { Pencil } from 'lucide-react';
 import type { Employee } from '../lib/types';
-import { skillColor } from '../lib/visuals';
 
-export function EmployeeChip({ employee, dimmed }: { employee: Employee; dimmed?: boolean }) {
+export function EmployeeChip({
+  employee,
+  dimmed,
+  onEdit,
+}: {
+  employee: Employee;
+  dimmed?: boolean;
+  onEdit?: (employee: Employee) => void;
+}) {
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
     id: `emp:${employee.id}`,
     data: { employeeId: employee.id },
   });
 
-  const color = skillColor[employee.primarySkill];
-
   return (
-    <button
+    <div
       ref={setNodeRef}
       {...listeners}
       {...attributes}
@@ -20,12 +26,17 @@ export function EmployeeChip({ employee, dimmed }: { employee: Employee; dimmed?
         ${dimmed ? 'border-transparent opacity-40' : 'border-[var(--line)] hover:border-[var(--tally)]/60 hover:bg-[var(--panel-raised)]'}
         cursor-grab active:cursor-grabbing bg-[var(--panel)]`}
     >
-      <span
-        className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full font-mono text-[11px] font-semibold text-[var(--ink)]"
-        style={{ backgroundColor: color }}
-      >
-        {employee.initials}
-      </span>
+      {employee.photo ? (
+        <img
+          src={employee.photo}
+          alt={employee.name}
+          className="h-7 w-7 shrink-0 rounded-full object-cover"
+        />
+      ) : (
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[var(--tally)] font-mono text-[11px] font-semibold text-[var(--ink)]">
+          {employee.initials}
+        </span>
+      )}
       <span className="min-w-0 flex-1">
         <span className="block truncate text-[13px] font-medium leading-tight text-[var(--text-primary)]">
           {employee.name}
@@ -34,6 +45,20 @@ export function EmployeeChip({ employee, dimmed }: { employee: Employee; dimmed?
           {employee.grade}
         </span>
       </span>
-    </button>
+      {onEdit && (
+        <button
+          type="button"
+          aria-label={`Edit ${employee.name}`}
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => {
+            e.stopPropagation();
+            onEdit(employee);
+          }}
+          className="shrink-0 rounded p-1 text-[var(--text-muted)] opacity-0 transition hover:text-[var(--text-primary)] group-hover:opacity-100"
+        >
+          <Pencil size={13} />
+        </button>
+      )}
+    </div>
   );
 }
