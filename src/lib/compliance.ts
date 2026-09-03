@@ -4,6 +4,21 @@ import { gradeNumber } from './data';
 const MIN_TURNAROUND_HOURS = 10; // HARD — industrial minimum
 const PREFERRED_TURNAROUND_HOURS = 11; // company fatigue standard
 const MAX_CONSECUTIVE_NIGHTS_WARNING = 3;
+const MAX_SHIFT_HOURS = 12; // universal fatigue/safety limit, all employment types
+const MAX_WEEK_HOURS = 50; // universal weekly cap, all employment types
+const FULLTIME_WEEK_STD_HOURS = 38; // standard week for Permanent staff
+const FULLTIME_WEEK_REASONABLE_HOURS = 40; // reasonable additional before it's overtime, Permanent staff only
+
+function mondayOf(day: string): string {
+  const d = new Date(`${day}T00:00:00`);
+  const diffFromMonday = (d.getDay() + 6) % 7;
+  d.setDate(d.getDate() - diffFromMonday);
+  return d.toISOString().slice(0, 10);
+}
+
+function durationHours(shift: Shift): number {
+  return (shiftEnd(shift).getTime() - shiftStart(shift).getTime()) / 3_600_000;
+}
 
 function toDate(day: string, time: string, rollFrom?: Date): Date {
   const d = new Date(`${day}T${time}:00`);
@@ -103,6 +118,53 @@ export function computeCompliance(
           severity: 'warning',
           label: `${run}rd/th consecutive night shift`,
         });
+      }
+    }
+
+    // Max shift length — universal fatigue/safety limit
+    for (const s of empShifts) {
+      const dur = durationHours(s);
+      if (dur > MAX_SHIFT_HOURS) {
+        addFlag(s.id, emp.id, {
+          severity: 'warning',
+          label: `${dur.toFixed(1)}h shift — over the ${MAX_SHIFT_HOURS}h limit`,
+        });
+      }
+    }
+
+    // Weekly hours — universal cap, plus a tighter standard/reasonable band for Permanent staff
+    const hoursByWeek = new Map<string, { hours: number; shiftIds: string[] }>();
+    for (const s of empShifts) {
+      const week = mondayOf(s.day);
+      const entry = hoursByWeek.get(week) ?? { hours: 0, shiftIds: [] };
+      entry.hours += durationHours(s);
+      entry.shiftIds.push(s.id);
+      hoursByWeek.set(week, entry);
+    }
+    const isFullTime = emp.grade === 'Permanent';
+    for (const { hours, shiftIds } of hoursByWeek.values()) {
+      if (hours > MAX_WEEK_HOURS) {
+        for (const id of shiftIds) {
+          addFlag(id, emp.id, {
+            severity: 'warning',
+            label: `${Math.round(hours)}h this week — over the ${MAX_WEEK_HOURS}h week`,
+          });
+        }
+      }
+      if (isFullTime && hours > FULLTIME_WEEK_REASONABLE_HOURS) {
+        for (const id of shiftIds) {
+          addFlag(id, emp.id, {
+            severity: 'warning',
+            label: `${Math.round(hours)}h this week — overtime (over ${FULLTIME_WEEK_REASONABLE_HOURS}h reasonable additional)`,
+          });
+        }
+      } else if (isFullTime && hours > FULLTIME_WEEK_STD_HOURS) {
+        for (const id of shiftIds) {
+          addFlag(id, emp.id, {
+            severity: 'warning',
+            label: `${Math.round(hours)}h this week — reasonable additional hours (over ${FULLTIME_WEEK_STD_HOURS}h standard)`,
+          });
+        }
       }
     }
   }
