@@ -22,7 +22,7 @@ export function AssignedChip({
 
   return (
     <div
-      className="group relative flex items-center gap-1.5 rounded-md py-1 pl-1 pr-1.5"
+      className="group relative flex items-center gap-1.5 rounded-md py-[5px] pl-[5px] pr-2 md:py-1 md:pl-1 md:pr-1.5"
       style={{
         backgroundColor: 'var(--panel-raised)',
         boxShadow: worst === 'ok' ? 'none' : `0 0 0 1.5px ${ring}`,
@@ -30,21 +30,21 @@ export function AssignedChip({
       title={flags.map((f) => f.label).join(' • ')}
     >
       {employee.photo ? (
-        <img src={employee.photo} alt={employee.name} className="h-5 w-5 shrink-0 rounded-full object-cover" />
+        <img src={employee.photo} alt={employee.name} className="h-[22px] w-[22px] shrink-0 rounded-full object-cover md:h-5 md:w-5" />
       ) : (
         <span
-          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full font-mono text-[9px] font-semibold text-[var(--ink)]"
+          className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full font-mono text-[9.5px] font-semibold text-[var(--ink)] md:h-5 md:w-5 md:text-[9px]"
           style={{ backgroundColor: color }}
         >
           {employee.initials}
         </span>
       )}
-      <span className="truncate text-[11px] leading-none text-[var(--text-primary)]">
+      <span className="truncate text-[12px] leading-none text-[var(--text-primary)] md:text-[11px]">
         {employee.name.split(' ')[0]}
       </span>
       <button
         onClick={onRemove}
-        className="ml-0.5 shrink-0 rounded p-0.5 text-[var(--text-muted)] opacity-0 transition hover:bg-black/30 hover:text-[var(--signal-red)] group-hover:opacity-100"
+        className="ml-0.5 shrink-0 rounded p-0.5 text-[var(--text-muted)] opacity-100 transition hover:bg-black/30 hover:text-[var(--signal-red)] md:opacity-0 md:group-hover:opacity-100"
         aria-label={`Remove ${employee.name}`}
       >
         <X size={10} />

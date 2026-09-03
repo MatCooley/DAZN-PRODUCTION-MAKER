@@ -31,7 +31,7 @@ export function RequirementRow({
         isOver ? 'border-[var(--tally)] bg-[var(--tally)]/5' : 'border-transparent'
       }`}
     >
-      <div className="mb-1 flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-wide text-[var(--text-muted)]">
+      <div className="mb-1 flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-[var(--text-muted)] md:text-[9.5px]">
         <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: color }} />
         {skillLabel[requirement.skill]}
         <span className="text-[var(--text-muted)]/70">G{requirement.minGrade}+</span>
@@ -48,7 +48,7 @@ export function RequirementRow({
         {Array.from({ length: openSlots }).map((_, i) => (
           <div
             key={i}
-            className="flex h-[26px] min-w-[64px] items-center justify-center rounded-md border border-dashed border-[var(--line)] px-2 font-mono text-[9px] text-[var(--text-muted)]"
+            className="flex h-[28px] min-w-[64px] items-center justify-center rounded-md border border-dashed border-[var(--line)] px-2 font-mono text-[10px] text-[var(--text-muted)] md:h-[26px] md:text-[9px]"
           >
             open
           </div>

@@ -28,21 +28,21 @@ export function ShiftCard({
       title={statusLabel[status]}
     >
       <div className="w-[3px] shrink-0" style={{ backgroundColor: edgeColor }} />
-      <div className="flex-1 p-2.5">
+      <div className="flex-1 p-3 md:p-2.5">
         <div className="mb-1.5 flex items-start justify-between gap-2">
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
-              <span className="font-display text-[13px] font-semibold uppercase tracking-wide text-[var(--text-primary)]">
+              <span className="font-display text-[14px] font-semibold uppercase tracking-wide text-[var(--text-primary)] md:text-[13px]">
                 {slotLabel[shift.slot]}
               </span>
-              <span className="font-mono text-[10px] text-[var(--text-muted)]">
+              <span className="font-mono text-[12px] font-bold text-[var(--text-primary)] md:text-[10.5px]">
                 {shift.start}–{shift.end}
               </span>
             </div>
-            <div className="truncate text-[11px] text-[var(--text-muted)]">{shift.production}</div>
+            <div className="truncate text-[12px] text-[var(--text-muted)] md:text-[11px]">{shift.production}</div>
           </div>
           <div
-            className="shrink-0 rounded-full px-1.5 py-0.5 font-mono text-[9.5px] font-medium"
+            className="shrink-0 rounded-full px-2 py-1 font-mono text-[10px] font-medium md:px-1.5 md:py-0.5 md:text-[9.5px]"
             style={{ color: edgeColor, backgroundColor: `${edgeColor}1a` }}
           >
             {fill.filled}/{fill.required}
