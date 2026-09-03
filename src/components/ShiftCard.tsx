@@ -35,7 +35,10 @@ export function ShiftCard({
               <span className="font-display text-[14px] font-semibold uppercase tracking-wide text-[var(--text-primary)] md:text-[13px]">
                 {slotLabel[shift.slot]}
               </span>
-              <span className="font-mono text-[12px] font-bold text-[var(--text-primary)] md:text-[10.5px]">
+              <span
+                className="whitespace-nowrap font-mono text-[12px] font-bold md:text-[10.5px]"
+                style={{ color: shift.slot === 'EARLY' ? 'var(--signal-amber)' : 'var(--text-primary)' }}
+              >
                 {shift.start}–{shift.end}
               </span>
             </div>
