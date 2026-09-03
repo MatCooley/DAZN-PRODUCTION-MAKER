@@ -38,7 +38,7 @@ export function EmployeeChip({
         </span>
       )}
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px] font-medium leading-tight text-[var(--text-primary)]">
+        <span title={employee.name} className="block truncate text-[13px] font-medium leading-tight text-[var(--text-primary)]">
           {employee.name}
         </span>
         <span className="block truncate font-mono text-[10px] leading-tight text-[var(--text-muted)]">

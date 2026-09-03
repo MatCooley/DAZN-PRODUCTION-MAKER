@@ -19,14 +19,22 @@ export function Board({
   onRemove: (shiftId: string, skill: string, employeeId: string) => void;
 }) {
   return (
-    <div className="grid flex-1 grid-cols-7 gap-2.5 p-3">
+    // No gap/padding between columns — borders do the separating instead —
+    // so the columns divide the width identically to the Studio board's
+    // own day columns directly above it in Half/Half view. Tracks are
+    // minmax(190px, 1fr): they grow to fill available space like the
+    // Studio board's, but never shrink below 190px — below that the grid
+    // overflows its container and the outer wrapper scrolls horizontally,
+    // instead of a plain 1fr track shrinking a min-w'd child until it
+    // overflows into the next column and the two headers overlap.
+    <div className="grid flex-1 grid-cols-[repeat(7,minmax(190px,1fr))]">
       {days.map((day) => {
         const dayShifts = shifts
           .filter((s) => s.day === day.date)
           .sort((a, b) => slotOrder[a.slot] - slotOrder[b.slot]);
 
         return (
-          <div key={day.date} className="flex min-w-[190px] flex-col gap-2.5">
+          <div key={day.date} className="flex flex-col gap-2.5 border-r border-[var(--line)] p-3">
             <div className="sticky top-0 z-10 flex items-baseline justify-between bg-[var(--ink)] px-0.5 py-1.5">
               <span className="font-display text-[13px] font-semibold uppercase tracking-wide text-[var(--text-primary)]">
                 {day.label}

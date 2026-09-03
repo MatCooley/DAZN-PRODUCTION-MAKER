@@ -1,7 +1,13 @@
 import type { FacilityEventType } from './facilityTypes';
 
 export const DEFAULT_PX_PER_HOUR = 34; // fallback before the container is measured
-export const MIN_PX_PER_HOUR = 6; // below this, hour ticks/labels stop being legible — horizontal scroll takes over
+export const MIN_PX_PER_HOUR = 6; // Day view only — below this, hour ticks/labels stop being legible
+// Week view's day columns share a floor with the Roster board's day
+// columns (Board.tsx / RosterTable.tsx, both 190px) so the two panels
+// clamp to the identical width — and stay aligned — once either one runs
+// out of room, instead of drifting apart at two unrelated floors.
+export const MIN_DAY_COLUMN_WIDTH_WEEK = 190;
+export const MIN_PX_PER_HOUR_WEEK = MIN_DAY_COLUMN_WIDTH_WEEK / 24;
 export const MAX_PX_PER_HOUR_WEEK = 34; // don't stretch a 7-day view absurdly wide on very large screens
 export const MAX_PX_PER_HOUR_DAY = 90; // Day view has far more room per hour to work with — use it
 export const ROW_HEIGHT = 52;

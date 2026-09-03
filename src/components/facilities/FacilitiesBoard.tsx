@@ -30,6 +30,7 @@ import type { Shift } from '../../lib/types';
 import {
   DEFAULT_PX_PER_HOUR,
   MIN_PX_PER_HOUR,
+  MIN_PX_PER_HOUR_WEEK,
   MAX_PX_PER_HOUR_WEEK,
   MAX_PX_PER_HOUR_DAY,
   studioAccentColor,
@@ -85,11 +86,12 @@ export function FacilitiesBoard({
     const SAFETY_MARGIN = 24;
     const daysToFit = viewMode === 'day' ? 1 : 7;
     const maxPxPerHour = viewMode === 'day' ? MAX_PX_PER_HOUR_DAY : MAX_PX_PER_HOUR_WEEK;
+    const minPxPerHour = viewMode === 'day' ? MIN_PX_PER_HOUR : MIN_PX_PER_HOUR_WEEK;
 
     function recalc() {
       const available = el!.clientWidth - LABEL_COLUMN_WIDTH - SAFETY_MARGIN;
       const fit = available / (daysToFit * 24);
-      setPxPerHour(Math.min(maxPxPerHour, Math.max(MIN_PX_PER_HOUR, fit)));
+      setPxPerHour(Math.min(maxPxPerHour, Math.max(minPxPerHour, fit)));
     }
 
     recalc();

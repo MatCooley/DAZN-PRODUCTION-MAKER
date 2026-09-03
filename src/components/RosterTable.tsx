@@ -16,17 +16,22 @@ export function RosterTable({
   const table = buildRosterTable(employees, shifts, assignments);
 
   return (
-    <div className="h-full overflow-auto p-3">
-      <table className="w-full min-w-[900px] border-separate border-spacing-0">
+    <div className="h-full overflow-auto py-3">
+      {/* No horizontal padding — the Studio board's scroll container above
+          has none either, so the 200px label column and day columns line
+          up between the two panels in Half/Half view. */}
+      <table className="w-full min-w-[900px] table-fixed border-separate border-spacing-0">
         <thead>
           <tr>
-            <th className="sticky left-0 top-0 z-10 min-w-[160px] border-b border-r border-[var(--line)] bg-[var(--panel)] p-2 text-left font-display text-[11px] font-semibold uppercase tracking-wide text-[var(--text-primary)]">
+            {/* Fixed at 200px to line up with the Studio board's own
+                sticky label column directly above it in Half/Half view. */}
+            <th className="sticky left-0 top-0 z-10 w-[200px] border-b border-r border-[var(--line)] bg-[var(--panel)] p-2 text-left font-display text-[11px] font-semibold uppercase tracking-wide text-[var(--text-primary)]">
               Staff
             </th>
             {days.map((day) => (
               <th
                 key={day.date}
-                className="sticky top-0 z-0 min-w-[150px] border-b border-r border-[var(--line)] bg-[var(--panel)] p-2 text-left font-display text-[11px] font-semibold uppercase tracking-wide text-[var(--text-primary)]"
+                className="sticky top-0 z-0 border-b border-r border-[var(--line)] bg-[var(--panel)] p-2 text-left font-display text-[11px] font-semibold uppercase tracking-wide text-[var(--text-primary)]"
               >
                 {day.label} <span className="font-mono text-[10px] font-normal text-[var(--text-muted)]">{day.date.slice(8)}</span>
               </th>
@@ -71,11 +76,11 @@ export function RosterTable({
                               className="rounded border-l-2 bg-[var(--panel-raised)]/60 px-1.5 py-1"
                               style={{ borderColor: skillColor[entry.skill] }}
                             >
-                              <div className="text-[10.5px] font-medium leading-tight text-[var(--text-primary)]">
-                                Shift-{skillLabel[entry.skill]} {entry.production}
-                              </div>
-                              <div className="font-mono text-[9.5px] leading-tight text-[var(--text-muted)]">
+                              <div className="font-mono text-[12px] font-bold leading-tight text-[var(--text-primary)]">
                                 {formatShiftTime(entry.start, entry.end)}
+                              </div>
+                              <div className="text-[10.5px] font-medium leading-tight text-[var(--text-muted)]">
+                                Shift-{skillLabel[entry.skill]} {entry.production}
                               </div>
                             </div>
                           ))}

@@ -43,7 +43,9 @@ export function Sidebar({
   }, [employees, query, roleFilter, managerTeamFilter]);
 
   return (
-    <aside className="flex h-full w-[248px] shrink-0 flex-col border-r border-[var(--line)] bg-[var(--panel)]/60">
+    // 200px to match the Studio board's own label column above it in
+    // Half/Half view, so the day columns in both panels line up.
+    <aside className="flex h-full w-[200px] shrink-0 flex-col border-r border-[var(--line)] bg-[var(--panel)]/60">
       <div className="border-b border-[var(--line)] p-3">
         <h2 className="font-display text-[15px] font-semibold uppercase tracking-wide text-[var(--text-primary)]">
           Operators

@@ -94,24 +94,27 @@ export function ShowMakerWizard({
 }) {
   const [step, setStep] = useState(0);
   const [query, setQuery] = useState('');
-  const [draft, setDraft] = useState<BookingDraft>({
-    template: null,
-    studio: '',
-    resourceSelection: 'BOTH',
-    date: '2026-08-24',
-    endDate: '2026-08-24',
-    startTime: '16:00',
-    endTime: '20:00',
-    durationHours: hoursBetween('16:00', '20:00'),
-    title: '',
-    production: '',
-    client: '',
-    repeatDays: [1], // Monday — matches the default date above
-    repeatWeeks: 0,
-    liveTxStart: '18:30',
-    liveTxEnd: '19:30',
-    excludedCrewRoles: [],
-    customCrew: [],
+  const [draft, setDraft] = useState<BookingDraft>(() => {
+    const today = toLocalDateString(new Date());
+    return {
+      template: null,
+      studio: '',
+      resourceSelection: 'BOTH',
+      date: today,
+      endDate: today,
+      startTime: '00:00',
+      endTime: '00:00',
+      durationHours: hoursBetween('00:00', '00:00'),
+      title: '',
+      production: '',
+      client: '',
+      repeatDays: [], // none selected — a single booking on `date` until the user opts into a pattern
+      repeatWeeks: 0,
+      liveTxStart: '00:00',
+      liveTxEnd: '00:00',
+      excludedCrewRoles: [],
+      customCrew: [],
+    };
   });
 
   const filteredTemplates = useMemo(() => {
@@ -122,7 +125,6 @@ export function ShowMakerWizard({
 
   function pickTemplate(t: ShowTemplate | null) {
     setDraft((d) => {
-      const anchorDay = new Date(`${d.date}T00:00:00`).getDay();
       const dur = t ? defaultDuration(t) : d.durationHours;
       const endTime = t ? addHours(d.startTime, dur) : d.endTime;
       return {
@@ -134,7 +136,6 @@ export function ShowMakerWizard({
         durationHours: dur,
         title: stripTrailingWeekday(t?.name ?? d.title),
         production: t?.name ?? d.production,
-        repeatDays: [anchorDay],
         excludedCrewRoles: [],
         customCrew: [],
       };
