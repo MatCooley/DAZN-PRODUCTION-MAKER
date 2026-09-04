@@ -65,7 +65,9 @@ export function FacilitiesBoard({
   const [currentUser, setCurrentUser] = useState<SimUser>(simUsers[0]);
   const [changeRequests, setChangeRequests] = useState<ChangeRequest[]>([]);
   const [toast, setToast] = useState<string | null>(null);
-  const [anchor, setAnchor] = useState<Date>(DEMO_ANCHOR);
+  // Opens on the real current week, not the fixed demo week the seed data
+  // lives in — "Jump to bookings" is how you get back to the seeded week.
+  const [anchor, setAnchor] = useState<Date>(new Date());
   const [viewMode, setViewMode] = useState<ViewMode>('week');
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editingEvent, setEditingEvent] = useState<FacilityEvent | null>(null);
