@@ -1,5 +1,45 @@
-@import url('https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
+
+/* DAZN's real brand typeface — three widths of the same design, each
+   shipped as separate static Regular/Bold files rather than a single
+   variable font, so each width is registered as its own family. */
+@font-face {
+  font-family: 'Zone';
+  src: url('./assets/fonts/Zone-Regular.ttf') format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Zone';
+  src: url('./assets/fonts/Zone-Bold.ttf') format('truetype');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Zone Narrow';
+  src: url('./assets/fonts/Zone-NarrowRegular.ttf') format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Zone Narrow';
+  src: url('./assets/fonts/Zone-NarrowBold.ttf') format('truetype');
+  font-weight: 700;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Zone Wide';
+  src: url('./assets/fonts/Zone-WideRegular.ttf') format('truetype');
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Zone Wide';
+  src: url('./assets/fonts/Zone-WideBold.ttf') format('truetype');
+  font-weight: 700;
+  font-display: swap;
+}
 
 :root {
   --ink: #0b0f14;
@@ -26,7 +66,7 @@ body {
 }
 
 .font-display {
-  font-family: 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif;
+  font-family: 'Zone Narrow', 'Barlow Condensed', ui-sans-serif, system-ui, sans-serif;
 }
 
 .font-mono {
