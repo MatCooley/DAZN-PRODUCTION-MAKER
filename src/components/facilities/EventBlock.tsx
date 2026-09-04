@@ -3,6 +3,7 @@ import { Link2, Repeat, Users, MoveRight } from 'lucide-react';
 import type { FacilityEvent } from '../../lib/facilityTypes';
 import { toLocalDateString } from '../../lib/dateUtils';
 import { SNAP_HOURS, conflictStyle, facilityEventStyle } from '../../lib/facilityVisuals';
+import { showIconFor } from '../../lib/showIcons';
 
 const DRAGGABLE_TYPES = new Set(['BOOKING', 'HOLD', 'MAINTENANCE', 'BLACKOUT']);
 const CLICK_THRESHOLD_PX = 4;
@@ -88,6 +89,10 @@ export function EventBlock({
   const isAvailability = event.eventType === 'AVAILABILITY_WINDOW';
   const badgeCount = [event.linkedBookingSetId, event.seriesId, event.bookingGroupId].filter(Boolean).length;
   const crossesMidnight = toLocalDateString(new Date(event.start)) !== toLocalDateString(new Date(event.end));
+  // Design idea: the show's real brand icon, revealed on hover rather than
+  // shrunk to fit the bar — these are detailed illustrated marks that only
+  // read at real size, so a tiny persistent badge would just blur them out.
+  const showIcon = event.eventType === 'BOOKING' ? showIconFor(event.showKey, event.title ?? event.production) : undefined;
 
   return (
     <div
@@ -96,7 +101,7 @@ export function EventBlock({
         if (isAvailability) onClick(event, e.currentTarget.getBoundingClientRect());
         e.stopPropagation();
       }}
-      className={`absolute top-1.5 flex items-center gap-1 overflow-hidden rounded-[4px] border px-1.5 transition-shadow
+      className={`group absolute top-1.5 flex items-center gap-1 rounded-[4px] border px-1.5 transition-shadow
         ${draggable ? 'cursor-grab active:cursor-grabbing' : isAvailability ? 'cursor-pointer' : 'cursor-default'}
         ${drag ? 'z-20 shadow-lg' : 'z-0'}`}
       style={{
@@ -111,6 +116,14 @@ export function EventBlock({
       }}
       title={`${event.title ?? event.eventType} — ${event.start.slice(11, 16)}–${event.end.slice(11, 16)}${crossesMidnight ? ' (continues into the next day)' : ''}`}
     >
+      {showIcon && !drag && (
+        <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 hidden -translate-x-1/2 flex-col items-center gap-1 rounded-lg border border-[var(--line)] bg-[var(--panel-raised)] p-2 shadow-2xl group-hover:flex">
+          <img src={showIcon} alt="" className="h-16 w-16 rounded-full" />
+          <span className="max-w-[140px] truncate font-mono text-[10px] font-medium text-[var(--text-primary)]">
+            {event.title}
+          </span>
+        </div>
+      )}
       {badgeCount > 0 && (
         <span className="flex shrink-0 items-center gap-0.5 opacity-80">
           {event.linkedBookingSetId && <Link2 size={9} />}
