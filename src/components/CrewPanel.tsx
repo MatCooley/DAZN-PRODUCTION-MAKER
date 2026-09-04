@@ -196,7 +196,7 @@ export function CrewPanel({
                       className="rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold"
                       style={{
                         color: emp.grade === 'Permanent' ? 'var(--tally)' : 'var(--text-muted)',
-                        backgroundColor: emp.grade === 'Permanent' ? '#35c1d61a' : 'transparent',
+                        backgroundColor: emp.grade === 'Permanent' ? '#f5ff001a' : 'transparent',
                       }}
                     >
                       {emp.grade}

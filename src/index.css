@@ -51,7 +51,7 @@
   --signal-green: #3fbf7f;
   --signal-amber: #e8a93c;
   --signal-red: #e1543d;
-  --tally: #35c1d6;
+  --tally: #f5ff00; /* DAZN Yellow — the app's active/accent colour */
 }
 
 html, body, #root {
