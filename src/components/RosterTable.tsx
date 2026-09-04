@@ -1,5 +1,6 @@
 import { buildRosterTable, formatShiftTime } from '../lib/rosterTable';
 import { skillColor, skillLabel } from '../lib/visuals';
+import { nowClock } from '../lib/format';
 import type { Assignments, Employee, Shift } from '../lib/types';
 
 export function RosterTable({
@@ -14,6 +15,7 @@ export function RosterTable({
   assignments: Assignments;
 }) {
   const table = buildRosterTable(employees, shifts, assignments);
+  const { todayIso, label: nowLabel } = nowClock();
 
   return (
     <div className="h-full overflow-auto py-3">
@@ -28,14 +30,23 @@ export function RosterTable({
             <th className="sticky left-0 top-0 z-10 w-[200px] border-b border-r border-[var(--line)] bg-[var(--panel)] p-2 text-left font-display text-[11px] font-semibold uppercase tracking-wide text-[var(--text-primary)]">
               Staff
             </th>
-            {days.map((day) => (
-              <th
-                key={day.date}
-                className="sticky top-0 z-0 border-b border-r border-[var(--line)] bg-[var(--panel)] p-2 text-left font-display text-[11px] font-semibold uppercase tracking-wide text-[var(--text-primary)]"
-              >
-                {day.label} <span className="font-mono text-[10px] font-normal text-[var(--text-muted)]">{day.date.slice(8)}</span>
-              </th>
-            ))}
+            {days.map((day) => {
+              const isToday = day.date === todayIso;
+              return (
+                <th
+                  key={day.date}
+                  className="sticky top-0 z-0 border-b border-r border-[var(--line)] bg-[var(--panel)] p-2 text-left font-display text-[11px] font-semibold uppercase tracking-wide"
+                  style={{ color: isToday ? 'var(--tally)' : 'var(--text-primary)' }}
+                >
+                  {day.label} <span className="font-mono text-[10px] font-normal text-[var(--text-muted)]">{day.date.slice(8)}</span>
+                  {isToday && (
+                    <span className="ml-1.5 rounded px-1 py-0.5 font-mono text-[9px] font-bold text-[var(--ink)]" style={{ backgroundColor: 'var(--tally)' }}>
+                      {nowLabel}
+                    </span>
+                  )}
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>

@@ -26,6 +26,7 @@ import { ShowMakerWizard } from './ShowMakerWizard';
 import { EditBookingModal } from './EditBookingModal';
 import { statusColor } from '../../lib/visuals';
 import { buildDerivedShifts } from '../../lib/derivedShifts';
+import { nowClock } from '../../lib/format';
 import type { Shift } from '../../lib/types';
 import {
   DEFAULT_PX_PER_HOUR,
@@ -126,6 +127,16 @@ export function FacilitiesBoard({
   }, [viewMode, anchor]);
 
   const cellWidth = viewMode === 'month' ? 30 : viewMode === 'quarter' ? 11 : 72;
+
+  // A real now-line, positioned the same way an event bar is — only
+  // meaningful in Week/Day view, where the x-axis is actual hours.
+  const nowLine = useMemo(() => {
+    if (viewMode !== 'week' && viewMode !== 'day') return null;
+    const { todayIso, hour, label } = nowClock();
+    const dayIndex = days.findIndex((d) => d.date === todayIso);
+    if (dayIndex === -1) return null;
+    return { left: 200 + dayIndex * 24 * pxPerHour + hour * pxPerHour, label };
+  }, [days, viewMode, pxPerHour]);
 
   const conflicts = useMemo(() => computeConflicts(events), [events]);
   const resourcesById = useMemo(() => new Map(resources.map((r) => [r.id, r])), []);
@@ -464,6 +475,12 @@ export function FacilitiesBoard({
     (viewMode === 'week' && days[0].date === weekOf(DEMO_ANCHOR)[0].date) ||
     (viewMode === 'day' && demoWeekDates.has(days[0].date));
 
+  const currentWeek = useMemo(() => weekOf(new Date()), []);
+  const currentWeekDates = useMemo(() => new Set(currentWeek.map((d) => d.date)), [currentWeek]);
+  const isOnCurrentWeek =
+    (viewMode === 'week' && days[0].date === currentWeek[0].date) ||
+    (viewMode === 'day' && currentWeekDates.has(days[0].date));
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
       <div className="flex flex-wrap items-center justify-between gap-y-2 border-b border-[var(--line)] bg-[var(--panel)]/60 px-4 py-2">
@@ -486,6 +503,17 @@ export function FacilitiesBoard({
             {periodLabel(viewMode, anchor, days)}
           </span>
           <ViewModeSwitcher mode={viewMode} onChange={setViewMode} />
+          {!isOnCurrentWeek && (
+            <button
+              onClick={() => {
+                setAnchor(new Date());
+                setViewMode('week');
+              }}
+              className="flex items-center gap-1 rounded border border-[var(--tally)]/50 px-2 py-1 font-mono text-[9.5px] text-[var(--tally)] hover:bg-[var(--tally)]/10"
+            >
+              Now
+            </button>
+          )}
           {!isOnDemoPeriod && (
             <button
               onClick={() => {
@@ -533,7 +561,17 @@ export function FacilitiesBoard({
 
       {viewMode === 'week' || viewMode === 'day' ? (
         <div ref={scrollRef} className="min-h-0 flex-1 overflow-auto" onClick={() => setSelected(null)}>
-          <div className="inline-block min-w-full">
+          <div className="relative inline-block min-w-full">
+            {nowLine && (
+              <div className="pointer-events-none absolute top-9 bottom-0 z-40 w-px bg-[var(--tally)]" style={{ left: nowLine.left }}>
+                <span
+                  className="absolute bottom-full left-0 -translate-x-1/2 whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-[10px] font-bold text-[var(--ink)] shadow"
+                  style={{ backgroundColor: 'var(--tally)' }}
+                >
+                  {nowLine.label}
+                </span>
+              </div>
+            )}
             <div className="sticky top-0 z-20 flex bg-[var(--panel)]">
               <div className="sticky left-0 z-30 w-[200px] shrink-0 border-b border-r border-[var(--line)] bg-[var(--panel)]" />
               <TimeRuler days={days} pxPerHour={pxPerHour} onDayClick={handleDayHeaderClick} />

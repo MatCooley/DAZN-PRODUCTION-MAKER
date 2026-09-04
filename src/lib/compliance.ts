@@ -1,4 +1,4 @@
-import type { Assignments, ComplianceFlag, Employee, Shift, FlagSeverity } from './types';
+import type { Assignments, ComplianceFlag, DayOff, Employee, Shift, FlagSeverity } from './types';
 import { gradeNumber } from './data';
 
 const MIN_TURNAROUND_HOURS = 10; // HARD — industrial minimum
@@ -6,10 +6,10 @@ const PREFERRED_TURNAROUND_HOURS = 11; // company fatigue standard
 const MAX_CONSECUTIVE_NIGHTS_WARNING = 3;
 const MAX_SHIFT_HOURS = 12; // universal fatigue/safety limit, all employment types
 const MAX_WEEK_HOURS = 50; // universal weekly cap, all employment types
-const FULLTIME_WEEK_STD_HOURS = 38; // standard week for Permanent staff
+export const FULLTIME_WEEK_STD_HOURS = 38; // standard week for Permanent staff
 const FULLTIME_WEEK_REASONABLE_HOURS = 40; // reasonable additional before it's overtime, Permanent staff only
 
-function mondayOf(day: string): string {
+export function mondayOf(day: string): string {
   const d = new Date(`${day}T00:00:00`);
   const diffFromMonday = (d.getDay() + 6) % 7;
   d.setDate(d.getDate() - diffFromMonday);
@@ -212,4 +212,226 @@ export function computeCompliance(
   }
 
   return { shiftStatus, assignmentFlags, shiftFillSummary };
+}
+
+// Same three questions asked live while a chip is dragged over a slot that
+// the compliance pass answers after the drop: is this person signed off for
+// the role, are they already on this shift, is the slot full, and would
+// this land them on something that overlaps or leaves too little turnaround.
+export type DropVerdict = 'ok' | 'tight' | 'busy' | 'invalid' | 'full' | 'duplicate';
+
+export function computeDropVerdict(
+  shiftsById: Map<string, Shift>,
+  assignments: Assignments,
+  employeesById: Map<string, Employee>,
+  shiftId: string,
+  skill: string,
+  employeeId: string
+): DropVerdict | null {
+  const shift = shiftsById.get(shiftId);
+  const employee = employeesById.get(employeeId);
+  if (!shift || !employee) return null;
+
+  const requirement = shift.requirements.find((r) => r.skill === skill);
+  if (!requirement) return null;
+  if (!employee.skills.includes(requirement.skill)) return 'invalid';
+
+  const shiftAssignments = assignments[shiftId] ?? {};
+  const alreadyOnShift = Object.values(shiftAssignments).some((ids) => ids.includes(employeeId));
+  if (alreadyOnShift) return 'duplicate';
+
+  const currentForSkill = shiftAssignments[skill] ?? [];
+  if (currentForSkill.length >= requirement.count) return 'full';
+
+  const meStart = shiftStart(shift).getTime();
+  const meEnd = shiftEnd(shift).getTime();
+  let tight = false;
+  for (const [otherShiftId, bySkill] of Object.entries(assignments)) {
+    if (otherShiftId === shiftId) continue;
+    if (!Object.values(bySkill).some((ids) => ids.includes(employeeId))) continue;
+    const other = shiftsById.get(otherShiftId);
+    if (!other) continue;
+    const otherStart = shiftStart(other).getTime();
+    const otherEnd = shiftEnd(other).getTime();
+    if (meStart < otherEnd && otherStart < meEnd) return 'busy';
+    const gapHours = (meStart >= otherEnd ? meStart - otherEnd : otherStart - meEnd) / 3_600_000;
+    if (gapHours < MIN_TURNAROUND_HOURS) tight = true;
+  }
+  return tight ? 'tight' : 'ok';
+}
+
+// ---------- Crew panel stats ----------
+// Per-employee hours/RDO picture, mirroring the same weekly bands used by
+// the compliance pass above so the two never disagree about what "over
+// standard" means.
+export interface CrewStat {
+  employeeId: string;
+  isFullTime: boolean;
+  hoursThisWeek: number;
+  daysWorkedThisWeek: number;
+  rdoOwed: number; // days off owed this week, full-time only
+  rdoWorkedThisWeek: number; // shifts this week landing on a marked day off
+  otSeasonHours: number; // cumulative hours past the 38h standard, full-time only, since the earliest known shift
+  weekBand: 'std' | 'extra' | 'over'; // this week's hours against the same 38h/40h marks the compliance pass uses, full-time only
+}
+
+export function computeCrewStats(
+  shifts: Shift[],
+  assignments: Assignments,
+  employees: Employee[],
+  daysOff: DayOff[],
+  weekStart: string
+): Record<string, CrewStat> {
+  const shiftsById = new Map(shifts.map((s) => [s.id, s]));
+  const shiftIdsByEmployee = new Map<string, string[]>();
+  for (const [shiftId, bySkill] of Object.entries(assignments)) {
+    for (const ids of Object.values(bySkill)) {
+      for (const empId of ids) {
+        const list = shiftIdsByEmployee.get(empId) ?? [];
+        list.push(shiftId);
+        shiftIdsByEmployee.set(empId, list);
+      }
+    }
+  }
+
+  const daysOffByEmployee = new Map<string, Set<string>>();
+  for (const off of daysOff) {
+    const set = daysOffByEmployee.get(off.employeeId) ?? new Set<string>();
+    set.add(off.date);
+    daysOffByEmployee.set(off.employeeId, set);
+  }
+
+  const weekEnd = (() => {
+    const d = new Date(`${weekStart}T00:00:00`);
+    d.setDate(d.getDate() + 6);
+    return d.toISOString().slice(0, 10);
+  })();
+
+  const result: Record<string, CrewStat> = {};
+  for (const emp of employees) {
+    const empShiftIds = shiftIdsByEmployee.get(emp.id) ?? [];
+    const empShifts = empShiftIds.map((id) => shiftsById.get(id)).filter((s): s is Shift => !!s);
+    const isFullTime = emp.grade === 'Permanent';
+    const markedOff = daysOffByEmployee.get(emp.id) ?? new Set<string>();
+
+    const datesThisWeek = new Set<string>();
+    let hoursThisWeek = 0;
+    let rdoWorkedThisWeek = 0;
+    for (const s of empShifts) {
+      if (s.day < weekStart || s.day > weekEnd) continue;
+      datesThisWeek.add(s.day);
+      hoursThisWeek += durationHours(s);
+      if (markedOff.has(s.day)) rdoWorkedThisWeek++;
+    }
+    const daysWorkedThisWeek = datesThisWeek.size;
+    const rdoOwed = isFullTime ? Math.max(0, daysWorkedThisWeek - 5) : 0;
+
+    let otSeasonHours = 0;
+    if (isFullTime) {
+      const hoursByWeek = new Map<string, number>();
+      for (const s of empShifts) {
+        const wk = mondayOf(s.day);
+        hoursByWeek.set(wk, (hoursByWeek.get(wk) ?? 0) + durationHours(s));
+      }
+      for (const hours of hoursByWeek.values()) {
+        otSeasonHours += Math.max(0, hours - FULLTIME_WEEK_STD_HOURS);
+      }
+    }
+
+    const weekBand: CrewStat['weekBand'] = !isFullTime
+      ? 'std'
+      : hoursThisWeek > FULLTIME_WEEK_REASONABLE_HOURS
+        ? 'over'
+        : hoursThisWeek > FULLTIME_WEEK_STD_HOURS
+          ? 'extra'
+          : 'std';
+
+    result[emp.id] = { employeeId: emp.id, isFullTime, hoursThisWeek, daysWorkedThisWeek, rdoOwed, rdoWorkedThisWeek, otSeasonHours, weekBand };
+  }
+  return result;
+}
+
+// ---------- Crew member detail ----------
+const DAILY_STD_HOURS = 8;
+export const FULLTIME_MONTH_STD_HOURS = FULLTIME_WEEK_STD_HOURS * 4;
+
+function shiftsForEmployee(shifts: Shift[], assignments: Assignments, employeeId: string): Shift[] {
+  const shiftsById = new Map(shifts.map((s) => [s.id, s]));
+  const out: Shift[] = [];
+  for (const [shiftId, bySkill] of Object.entries(assignments)) {
+    if (!Object.values(bySkill).some((ids) => ids.includes(employeeId))) continue;
+    const shift = shiftsById.get(shiftId);
+    if (shift) out.push(shift);
+  }
+  return out;
+}
+
+export interface DailyOvertime {
+  date: string;
+  worked: number;
+  overtime: number;
+  production: string;
+}
+
+// Any day this person worked past the 8h daily standard, with what they
+// were on — the list a coordinator is asked to justify.
+export function computeDailyOvertime(
+  shifts: Shift[],
+  assignments: Assignments,
+  employeeId: string,
+  days: string[]
+): DailyOvertime[] {
+  const daySet = new Set(days);
+  const byDate = new Map<string, { worked: number; productions: string[] }>();
+  for (const s of shiftsForEmployee(shifts, assignments, employeeId)) {
+    if (!daySet.has(s.day)) continue;
+    const entry = byDate.get(s.day) ?? { worked: 0, productions: [] };
+    entry.worked += durationHours(s);
+    entry.productions.push(s.production);
+    byDate.set(s.day, entry);
+  }
+  const out: DailyOvertime[] = [];
+  for (const [date, { worked, productions }] of byDate) {
+    if (worked > DAILY_STD_HOURS) {
+      out.push({ date, worked, overtime: worked - DAILY_STD_HOURS, production: productions.join(', ') });
+    }
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+// The trailing 30 days ending on the last day of the displayed week, same
+// window shape as the season figure above and for the same reason: it
+// always fully contains the visible week, so it can never read lower.
+export function computeRolling30DayHours(shifts: Shift[], assignments: Assignments, employeeId: string, weekEnd: string): number {
+  const end = new Date(`${weekEnd}T00:00:00`);
+  const start = new Date(end);
+  start.setDate(start.getDate() - 29);
+  const startIso = start.toISOString().slice(0, 10);
+  let hours = 0;
+  for (const s of shiftsForEmployee(shifts, assignments, employeeId)) {
+    if (s.day >= startIso && s.day <= weekEnd) hours += durationHours(s);
+  }
+  return hours;
+}
+
+export interface MonthSummary {
+  calls: number;
+  hours: number;
+  days: number;
+  shifts: Shift[];
+}
+
+export function computeMonthSummary(
+  shifts: Shift[],
+  assignments: Assignments,
+  employeeId: string,
+  monthStart: string,
+  monthEnd: string
+): MonthSummary {
+  const inMonth = shiftsForEmployee(shifts, assignments, employeeId)
+    .filter((s) => s.day >= monthStart && s.day <= monthEnd)
+    .sort((a, b) => (a.day === b.day ? a.start.localeCompare(b.start) : a.day.localeCompare(b.day)));
+  const days = new Set(inMonth.map((s) => s.day));
+  const hours = inMonth.reduce((t, s) => t + durationHours(s), 0);
+  return { calls: inMonth.length, hours, days: days.size, shifts: inMonth };
 }

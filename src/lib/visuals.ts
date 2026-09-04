@@ -63,6 +63,29 @@ export const skillColor: Record<SkillCode, string> = {
   JIB: '#22d3ee',
 };
 
+// A coarse grouping label for each skill, purely for display — not a real
+// org chart, just enough to answer "what department" without inventing
+// per-person data we don't have.
+export const departmentForSkill: Record<SkillCode, string> = {
+  DA: 'Production',
+  PA: 'Production',
+  DIR: 'Direction',
+  SW: 'Vision',
+  TD: 'Vision',
+  VIZ: 'Vision',
+  CAM: 'Camera',
+  STEADI: 'Camera',
+  JIB: 'Camera',
+  AUD: 'Audio',
+  AUDA: 'Audio',
+  EVS: 'Replay',
+  FM: 'Floor',
+  STG: 'Floor',
+  LD: 'Lighting',
+  MU: 'Wardrobe',
+  WARD: 'Wardrobe',
+};
+
 export const slotLabel: Record<ShiftSlot, string> = {
   EARLY: 'Early',
   DAY: 'Day',

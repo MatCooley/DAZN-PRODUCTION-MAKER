@@ -1,8 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { Clapperboard, Users } from 'lucide-react';
 import { DndContext, DragOverlay, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { employees as initialEmployees, shifts as staticShifts, initialAssignments, days as initialRosterDays } from './lib/data';
-import type { Assignments, Employee, Shift } from './lib/types';
-import { computeCompliance } from './lib/compliance';
+import type { Assignments, DayOff, Employee, Shift } from './lib/types';
+import { computeCompliance, computeCrewStats, computeDropVerdict, mondayOf, type DropVerdict } from './lib/compliance';
+import { showLibrary, type ShowTemplate } from './lib/showLibrary';
+import type { ShowSchedule } from './lib/shows';
 import { TopBar } from './components/TopBar';
 import { RosterToolbar, type RosterViewMode } from './components/RosterToolbar';
 import { Sidebar } from './components/Sidebar';
@@ -10,9 +13,34 @@ import { Board } from './components/Board';
 import { RosterTable } from './components/RosterTable';
 import { EmployeeChip } from './components/EmployeeChip';
 import { EmployeeProfileModal } from './components/EmployeeProfileModal';
+import { CrewPanel } from './components/CrewPanel';
+import { ShowsPanel } from './components/ShowsPanel';
 import { FacilitiesBoard } from './components/facilities/FacilitiesBoard';
 import { SplitPane, type SplitLayoutMode } from './components/SplitPane';
 import { LayoutModeSwitcher } from './components/LayoutModeSwitcher';
+
+const NEW_EMPLOYEE_ID = '__new__';
+
+function makeEmployeeId(name: string, existingIds: Set<string>): string {
+  const base = name.trim().toLowerCase().split(/\s+/)[0]?.replace(/[^a-z0-9]/g, '') || 'crew';
+  if (!existingIds.has(base)) return base;
+  let n = 2;
+  while (existingIds.has(`${base}${n}`)) n++;
+  return `${base}${n}`;
+}
+
+function blankEmployee(): Employee {
+  return {
+    id: NEW_EMPLOYEE_ID,
+    name: '',
+    initials: '',
+    grade: 'Permanent',
+    agreement: 'BREA',
+    skills: [],
+    primarySkill: 'DA',
+    team: '',
+  };
+}
 
 export default function App() {
   const [employees, setEmployees] = useState<Employee[]>(initialEmployees);
@@ -23,6 +51,13 @@ export default function App() {
   const [rosterViewMode, setRosterViewMode] = useState<RosterViewMode>('board');
   const [rosterDays, setRosterDays] = useState(initialRosterDays);
   const [derivedShifts, setDerivedShifts] = useState<Shift[]>([]);
+  const [history, setHistory] = useState<{ label: string; assignments: Assignments }[]>([]);
+  const [daysOff, setDaysOff] = useState<DayOff[]>([]);
+  const [crewPanelOpen, setCrewPanelOpen] = useState(false);
+  const [customShows, setCustomShows] = useState<ShowTemplate[]>([]);
+  const [showSchedules, setShowSchedules] = useState<Record<string, ShowSchedule>>({});
+  const [hiddenShowKeys, setHiddenShowKeys] = useState<Set<string>>(new Set());
+  const [showsPanelOpen, setShowsPanelOpen] = useState(false);
 
   // Hand-authored shifts (real historical roster data) always win over a
   // booking-derived one for the SAME production on the SAME day, so a real
@@ -45,6 +80,10 @@ export default function App() {
 
   const employeesById = useMemo(() => new Map(employees.map((e) => [e.id, e])), [employees]);
   const compliance = useMemo(() => computeCompliance(shifts, assignments, employees), [shifts, assignments, employees]);
+  const crewStats = useMemo(
+    () => computeCrewStats(shifts, assignments, employees, daysOff, mondayOf(rosterDays[0].date)),
+    [shifts, assignments, employees, daysOff, rosterDays],
+  );
 
   const assignedCounts = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -79,6 +118,42 @@ export default function App() {
     };
   }, [shifts, rosterDays, compliance]);
 
+  const HISTORY_MAX = 60;
+  function pushHistory(label: string, snapshot: Assignments) {
+    setHistory((prev) => {
+      const next = [...prev, { label, assignments: snapshot }];
+      return next.length > HISTORY_MAX ? next.slice(next.length - HISTORY_MAX) : next;
+    });
+  }
+
+  function undoLast() {
+    if (history.length === 0) return;
+    const entry = history[history.length - 1];
+    setAssignments(entry.assignments);
+    setHistory((prev) => prev.slice(0, -1));
+  }
+
+  useEffect(() => {
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        undoLast();
+      }
+    }
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [history]);
+
+  // The same rules the drag preview shows are what decide the drop, so a
+  // slot that previews as assignable always is — there is no separate,
+  // possibly-diverging check at drop time.
+  function getDropVerdict(shiftId: string, skill: string): DropVerdict | null {
+    if (!draggingId) return null;
+    return computeDropVerdict(shiftsById, assignments, employeesById, shiftId, skill, draggingId.replace('emp:', ''));
+  }
+
   function handleDragStart(event: DragStartEvent) {
     setDraggingId(String(event.active.id));
   }
@@ -94,48 +169,80 @@ export default function App() {
     const employee = employeesById.get(employeeId);
     if (!shift || !employee) return;
 
-    const requirement = shift.requirements.find((r) => r.skill === skill);
-    if (!requirement) return;
-    if (!employee.skills.includes(requirement.skill)) return; // unqualified — silently reject
+    const verdict = computeDropVerdict(shiftsById, assignments, employeesById, shiftId, skill, employeeId);
+    if (verdict === null || verdict === 'invalid' || verdict === 'duplicate' || verdict === 'full') return;
 
-    setAssignments((prev) => {
-      const shiftAssignments = prev[shiftId] ?? {};
-      const currentForSkill = shiftAssignments[skill] ?? [];
-
-      // already assigned to this shift (any skill)? no duplicates within a shift
-      const alreadyOnShift = Object.values(shiftAssignments).some((ids) => ids.includes(employeeId));
-      if (alreadyOnShift) return prev;
-
-      // slot full
-      if (currentForSkill.length >= requirement.count) return prev;
-
-      return {
-        ...prev,
-        [shiftId]: {
-          ...shiftAssignments,
-          [skill]: [...currentForSkill, employeeId],
-        },
-      };
+    const shiftAssignments = assignments[shiftId] ?? {};
+    const currentForSkill = shiftAssignments[skill] ?? [];
+    pushHistory(`Assigned ${employee.name.split(' ')[0]} to ${shift.production}`, assignments);
+    setAssignments({
+      ...assignments,
+      [shiftId]: {
+        ...shiftAssignments,
+        [skill]: [...currentForSkill, employeeId],
+      },
     });
   }
 
   function handleSaveEmployee(updated: Employee) {
-    setEmployees((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+    if (updated.id === NEW_EMPLOYEE_ID) {
+      const id = makeEmployeeId(updated.name, new Set(employees.map((e) => e.id)));
+      setEmployees((prev) => [...prev, { ...updated, id }]);
+    } else {
+      setEmployees((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+    }
     setEditingEmployee(null);
   }
 
-  function handleRemove(shiftId: string, skill: string, employeeId: string) {
-    setAssignments((prev) => {
-      const shiftAssignments = prev[shiftId];
-      if (!shiftAssignments) return prev;
-      return {
-        ...prev,
-        [shiftId]: {
-          ...shiftAssignments,
-          [skill]: (shiftAssignments[skill] ?? []).filter((id) => id !== employeeId),
-        },
-      };
+  function handleUpdateEmployee(updated: Employee) {
+    setEmployees((prev) => prev.map((e) => (e.id === updated.id ? updated : e)));
+  }
+
+  function handleRemoveEmployee(employeeId: string) {
+    setEmployees((prev) => prev.filter((e) => e.id !== employeeId));
+  }
+
+  function toggleDayOff(employeeId: string, date: string) {
+    setDaysOff((prev) => {
+      const existing = prev.find((o) => o.employeeId === employeeId && o.date === date);
+      if (existing) return prev.filter((o) => o.id !== existing.id);
+      return [...prev, { id: `${employeeId}::${date}`, employeeId, date }];
     });
+  }
+
+  function handleRemove(shiftId: string, skill: string, employeeId: string) {
+    const shiftAssignments = assignments[shiftId];
+    if (!shiftAssignments) return;
+    const employee = employeesById.get(employeeId);
+    const shift = shiftsById.get(shiftId);
+    pushHistory(`Removed ${employee?.name.split(' ')[0] ?? 'crew'} from ${shift?.production ?? 'shift'}`, assignments);
+    setAssignments({
+      ...assignments,
+      [shiftId]: {
+        ...shiftAssignments,
+        [skill]: (shiftAssignments[skill] ?? []).filter((id) => id !== employeeId),
+      },
+    });
+  }
+
+  const allShows = useMemo(() => [...showLibrary, ...customShows], [customShows]);
+
+  function handleUpdateShowSchedule(key: string, updated: ShowSchedule) {
+    setShowSchedules((prev) => ({ ...prev, [key]: updated }));
+  }
+
+  function handleAddCustomShow(show: ShowTemplate) {
+    setCustomShows((prev) => [...prev, show]);
+  }
+
+  function handleHideShow(key: string) {
+    setHiddenShowKeys((prev) => new Set(prev).add(key));
+  }
+
+  function handleResetRoster() {
+    if (Object.keys(assignments).length === 0) return;
+    pushHistory('Reset roster', assignments);
+    setAssignments({});
   }
 
   const draggingEmployee = draggingId ? employeesById.get(draggingId.replace('emp:', '')) : undefined;
@@ -144,7 +251,23 @@ export default function App() {
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex h-screen flex-col bg-[var(--ink)]">
         <TopBar>
-          <LayoutModeSwitcher mode={layoutMode} onChange={setLayoutMode} />
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCrewPanelOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-[var(--line)] px-2.5 py-1.5 font-mono text-[10.5px] text-[var(--text-muted)] transition hover:border-[var(--tally)]/60 hover:text-[var(--text-primary)]"
+            >
+              <Users size={13} />
+              Crew
+            </button>
+            <button
+              onClick={() => setShowsPanelOpen(true)}
+              className="flex items-center gap-1.5 rounded-md border border-[var(--line)] px-2.5 py-1.5 font-mono text-[10.5px] text-[var(--text-muted)] transition hover:border-[var(--tally)]/60 hover:text-[var(--text-primary)]"
+            >
+              <Clapperboard size={13} />
+              Shows
+            </button>
+            <LayoutModeSwitcher mode={layoutMode} onChange={setLayoutMode} />
+          </div>
         </TopBar>
         <SplitPane
           defaultTopPct={55}
@@ -156,7 +279,10 @@ export default function App() {
                 coveragePct={coveragePct}
                 breachCount={breachCount}
                 warningCount={warningCount}
-                onReset={() => setAssignments({})}
+                onReset={handleResetRoster}
+                canUndo={history.length > 0}
+                undoLabel={history[history.length - 1]?.label}
+                onUndo={undoLast}
                 viewMode={rosterViewMode}
                 onViewModeChange={setRosterViewMode}
               />
@@ -182,6 +308,7 @@ export default function App() {
                       employeesById={employeesById}
                       compliance={compliance}
                       onRemove={handleRemove}
+                      getDropVerdict={getDropVerdict}
                     />
                   </div>
                 </div>
@@ -194,8 +321,37 @@ export default function App() {
       {editingEmployee && (
         <EmployeeProfileModal
           employee={editingEmployee}
+          isNew={editingEmployee.id === NEW_EMPLOYEE_ID}
           onClose={() => setEditingEmployee(null)}
           onSave={handleSaveEmployee}
+        />
+      )}
+      {crewPanelOpen && (
+        <CrewPanel
+          employees={employees}
+          shifts={shifts}
+          assignments={assignments}
+          crewStats={crewStats}
+          rosterDays={rosterDays}
+          daysOff={daysOff}
+          onToggleDayOff={toggleDayOff}
+          onClose={() => setCrewPanelOpen(false)}
+          onEditEmployee={setEditingEmployee}
+          onAddEmployee={() => setEditingEmployee(blankEmployee())}
+          onUpdateEmployee={handleUpdateEmployee}
+          onRemoveEmployee={handleRemoveEmployee}
+        />
+      )}
+      {showsPanelOpen && (
+        <ShowsPanel
+          shows={allShows}
+          employees={employees}
+          schedules={showSchedules}
+          hiddenKeys={hiddenShowKeys}
+          onClose={() => setShowsPanelOpen(false)}
+          onUpdateSchedule={handleUpdateShowSchedule}
+          onAddCustomShow={handleAddCustomShow}
+          onHideShow={handleHideShow}
         />
       )}
     </DndContext>

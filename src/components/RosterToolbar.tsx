@@ -1,4 +1,4 @@
-import { LayoutGrid, Table2 } from 'lucide-react';
+import { LayoutGrid, Table2, Undo2 } from 'lucide-react';
 import { statusColor } from '../lib/visuals';
 
 export type RosterViewMode = 'board' | 'table';
@@ -8,6 +8,9 @@ export function RosterToolbar({
   breachCount,
   warningCount,
   onReset,
+  canUndo,
+  undoLabel,
+  onUndo,
   viewMode,
   onViewModeChange,
 }: {
@@ -15,6 +18,9 @@ export function RosterToolbar({
   breachCount: number;
   warningCount: number;
   onReset: () => void;
+  canUndo: boolean;
+  undoLabel?: string;
+  onUndo: () => void;
   viewMode: RosterViewMode;
   onViewModeChange: (mode: RosterViewMode) => void;
 }) {
@@ -39,6 +45,15 @@ export function RosterToolbar({
         <Stat label="Coverage" value={`${coveragePct}%`} color={coveragePct === 100 ? statusColor.ok : statusColor.warning} />
         <Stat label="Breaches" value={String(breachCount)} color={breachCount > 0 ? statusColor.breach : 'var(--text-muted)'} />
         <Stat label="Warnings" value={String(warningCount)} color={warningCount > 0 ? statusColor.warning : 'var(--text-muted)'} />
+        <button
+          onClick={onUndo}
+          disabled={!canUndo}
+          title={canUndo ? `Undo — ${undoLabel}` : 'Nothing to undo'}
+          className="flex items-center gap-1 rounded-md border border-[var(--line)] px-2.5 py-1.5 font-mono text-[10.5px] text-[var(--text-muted)] transition hover:border-[var(--tally)]/60 hover:text-[var(--text-primary)] disabled:cursor-not-allowed disabled:opacity-30 disabled:hover:border-[var(--line)] disabled:hover:text-[var(--text-muted)]"
+        >
+          <Undo2 size={12} />
+          Undo
+        </button>
         <button
           onClick={onReset}
           className="rounded-md border border-[var(--line)] px-2.5 py-1.5 font-mono text-[10.5px] text-[var(--text-muted)] transition hover:border-[var(--tally)]/60 hover:text-[var(--text-primary)]"

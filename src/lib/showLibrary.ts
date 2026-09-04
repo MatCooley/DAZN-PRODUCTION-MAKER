@@ -77,3 +77,17 @@ const ROLE_TO_SKILL_CODE: Record<string, SkillCode> = {
 export function skillCodeForRole(role: string): SkillCode | undefined {
   return ROLE_TO_SKILL_CODE[role];
 }
+
+// The real per-episode rate for a role varies show to show, so "the" rate
+// for a skill is the average of every real rate on file for it — a summary
+// of actual sourced numbers, not an invented one.
+export function avgRateForSkill(skill: SkillCode): number | undefined {
+  const rates: number[] = [];
+  for (const show of showLibrary) {
+    for (const line of show.crew) {
+      if (skillCodeForRole(line.role) === skill) rates.push(line.rate);
+    }
+  }
+  if (!rates.length) return undefined;
+  return Math.round((rates.reduce((a, b) => a + b, 0) / rates.length) * 100) / 100;
+}

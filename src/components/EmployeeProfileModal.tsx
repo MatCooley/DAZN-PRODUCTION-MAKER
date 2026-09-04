@@ -5,10 +5,12 @@ import { allSkillCodes, skillColor, skillLabel, statusColor } from '../lib/visua
 
 export function EmployeeProfileModal({
   employee,
+  isNew,
   onClose,
   onSave,
 }: {
   employee: Employee;
+  isNew?: boolean;
   onClose: () => void;
   onSave: (updated: Employee) => void;
 }) {
@@ -26,14 +28,14 @@ export function EmployeeProfileModal({
   const canSave = !!draft.name.trim() && !!draft.initials.trim() && draft.skills.length > 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 p-4" onClick={onClose}>
       <div
         className="flex max-h-[85vh] w-[420px] flex-col rounded-lg border border-[var(--line)] bg-[var(--panel-raised)] shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-[var(--line)] px-4 py-3">
           <h2 className="font-display text-[16px] font-semibold uppercase tracking-wide text-[var(--text-primary)]">
-            Edit profile
+            {isNew ? 'Add crew member' : 'Edit profile'}
           </h2>
           <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-primary)]" aria-label="Close">
             <X size={16} />
@@ -142,7 +144,7 @@ export function EmployeeProfileModal({
             className="flex items-center gap-1 rounded-md px-3 py-1.5 font-mono text-[10.5px] font-medium disabled:opacity-30"
             style={{ backgroundColor: `${statusColor.ok}22`, color: statusColor.ok }}
           >
-            <Check size={12} /> Save changes
+            <Check size={12} /> {isNew ? 'Add crew member' : 'Save changes'}
           </button>
         </div>
       </div>

@@ -34,6 +34,8 @@ export interface Employee {
   primarySkill: SkillCode;
   photo?: string;
   team: string; // the manager-led team this person reports into, e.g. "Rach's Team"
+  email?: string;
+  phone?: string;
 }
 
 export type ShiftSlot = 'EARLY' | 'DAY' | 'LATE' | 'NIGHT';
@@ -56,6 +58,15 @@ export interface Shift {
 
 // assignments[shiftId][skill] = employeeId[]
 export type Assignments = Record<string, Record<string, string[]>>;
+
+// A day a coordinator has published as this person's rostered day off —
+// a record on the roster, not the absence of one, so a shift landing on
+// it has something concrete to contradict.
+export interface DayOff {
+  id: string;
+  employeeId: string;
+  date: string; // ISO date
+}
 
 export type FlagSeverity = 'ok' | 'warning' | 'breach';
 

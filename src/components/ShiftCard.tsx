@@ -1,5 +1,5 @@
 import type { Assignments, ComplianceFlag, Employee, Shift } from '../lib/types';
-import type { ShiftStatus } from '../lib/compliance';
+import type { DropVerdict, ShiftStatus } from '../lib/compliance';
 import { slotLabel, statusColor, statusLabel } from '../lib/visuals';
 import { RequirementRow } from './RequirementRow';
 
@@ -11,6 +11,7 @@ export function ShiftCard({
   employeesById,
   flagsForShift,
   onRemove,
+  getDropVerdict,
 }: {
   shift: Shift;
   status: ShiftStatus;
@@ -19,6 +20,7 @@ export function ShiftCard({
   employeesById: Map<string, Employee>;
   flagsForShift: Record<string, ComplianceFlag[]>;
   onRemove: (skill: string, employeeId: string) => void;
+  getDropVerdict: (skill: string) => DropVerdict | null;
 }) {
   const edgeColor = statusColor[status];
 
@@ -63,6 +65,7 @@ export function ShiftCard({
                 .filter((e): e is Employee => !!e)}
               flagsByEmployee={flagsForShift}
               onRemove={(empId) => onRemove(req.skill, empId)}
+              getDropVerdict={() => getDropVerdict(req.skill)}
             />
           ))}
         </div>

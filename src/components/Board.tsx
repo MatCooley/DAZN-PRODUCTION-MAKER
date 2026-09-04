@@ -1,6 +1,7 @@
 import { slotOrder } from '../lib/data';
 import type { Assignments, ComplianceFlag, Employee, Shift } from '../lib/types';
-import type { ComplianceResult } from '../lib/compliance';
+import type { ComplianceResult, DropVerdict } from '../lib/compliance';
+import { nowClock } from '../lib/format';
 import { ShiftCard } from './ShiftCard';
 
 export function Board({
@@ -10,6 +11,7 @@ export function Board({
   employeesById,
   compliance,
   onRemove,
+  getDropVerdict,
 }: {
   days: { date: string; label: string }[];
   shifts: Shift[];
@@ -17,7 +19,10 @@ export function Board({
   employeesById: Map<string, Employee>;
   compliance: ComplianceResult;
   onRemove: (shiftId: string, skill: string, employeeId: string) => void;
+  getDropVerdict: (shiftId: string, skill: string) => DropVerdict | null;
 }) {
+  const { todayIso, label: nowLabel } = nowClock();
+
   return (
     // No gap/padding between columns — borders do the separating instead —
     // so the columns divide the width identically to the Studio board's
@@ -32,14 +37,25 @@ export function Board({
         const dayShifts = shifts
           .filter((s) => s.day === day.date)
           .sort((a, b) => slotOrder[a.slot] - slotOrder[b.slot]);
+        const isToday = day.date === todayIso;
 
         return (
           <div key={day.date} className="flex flex-col gap-2.5 border-r border-[var(--line)] p-3">
             <div className="sticky top-0 z-10 flex items-baseline justify-between bg-[var(--ink)] px-0.5 py-1.5">
-              <span className="font-display text-[13px] font-semibold uppercase tracking-wide text-[var(--text-primary)]">
+              <span
+                className="font-display text-[13px] font-semibold uppercase tracking-wide"
+                style={{ color: isToday ? 'var(--tally)' : 'var(--text-primary)' }}
+              >
                 {day.label}
               </span>
-              <span className="font-mono text-[10px] text-[var(--text-muted)]">{day.date.slice(8)}</span>
+              <span className="flex items-center gap-1.5">
+                {isToday && (
+                  <span className="rounded px-1 py-0.5 font-mono text-[9px] font-bold text-[var(--ink)]" style={{ backgroundColor: 'var(--tally)' }}>
+                    {nowLabel}
+                  </span>
+                )}
+                <span className="font-mono text-[10px] text-[var(--text-muted)]">{day.date.slice(8)}</span>
+              </span>
             </div>
             {dayShifts.map((shift) => (
               <ShiftCard
@@ -51,6 +67,7 @@ export function Board({
                 employeesById={employeesById}
                 flagsForShift={compliance.assignmentFlags[shift.id] ?? {}}
                 onRemove={(skill: string, empId: string) => onRemove(shift.id, skill, empId)}
+                getDropVerdict={(skill: string) => getDropVerdict(shift.id, skill)}
               />
             ))}
             {dayShifts.length === 0 && (
