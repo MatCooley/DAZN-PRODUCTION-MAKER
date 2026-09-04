@@ -3,6 +3,7 @@ import { Plus, X } from 'lucide-react';
 import type { ShowTemplate } from '../lib/showLibrary';
 import type { Employee } from '../lib/types';
 import { defaultScheduleFor, scheduleSummary, type ShowSchedule } from '../lib/shows';
+import type { GenerateResult } from './facilities/FacilitiesBoard';
 import { statusColor } from '../lib/visuals';
 import { ShowDetail } from './ShowDetail';
 
@@ -15,6 +16,7 @@ export function ShowsPanel({
   onUpdateSchedule,
   onAddCustomShow,
   onHideShow,
+  onGenerate,
 }: {
   shows: ShowTemplate[];
   employees: Employee[];
@@ -24,6 +26,7 @@ export function ShowsPanel({
   onUpdateSchedule: (key: string, updated: ShowSchedule) => void;
   onAddCustomShow: (show: ShowTemplate) => void;
   onHideShow: (key: string) => void;
+  onGenerate: (show: ShowTemplate, schedule: ShowSchedule, fromDate: string, toDate: string) => GenerateResult;
 }) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [addingShow, setAddingShow] = useState(false);
@@ -61,6 +64,7 @@ export function ShowsPanel({
             onHideShow(selectedShow.key);
             setSelectedKey(null);
           }}
+          onGenerate={(fromDate, toDate) => onGenerate(selectedShow, scheduleFor(selectedShow), fromDate, toDate)}
         />
       </div>
     );

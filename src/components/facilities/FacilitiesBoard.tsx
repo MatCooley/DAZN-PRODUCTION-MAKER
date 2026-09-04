@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { ChevronLeft, ChevronRight, Plus, CalendarClock } from 'lucide-react';
 import { resources, initialFacilityEvents, weekOf, weekStartISO } from '../../lib/facilityData';
 import type { ChangeRequest, FacilityEvent, SimUser, BookingDraft } from '../../lib/facilityTypes';
@@ -27,7 +27,9 @@ import { EditBookingModal } from './EditBookingModal';
 import { statusColor } from '../../lib/visuals';
 import { buildDerivedShifts } from '../../lib/derivedShifts';
 import { nowClock } from '../../lib/format';
-import type { Shift } from '../../lib/types';
+import type { Assignments, Shift, SkillCode } from '../../lib/types';
+import { skillCodeForRole, type ShowTemplate } from '../../lib/showLibrary';
+import type { ShowSchedule } from '../../lib/shows';
 import {
   DEFAULT_PX_PER_HOUR,
   MIN_PX_PER_HOUR,
@@ -38,6 +40,16 @@ import {
   studioLetterOf,
   resourceKindOf,
 } from '../../lib/facilityVisuals';
+
+export interface GenerateResult {
+  created: number;
+  conflicts: number;
+  error?: string;
+}
+
+export interface FacilitiesBoardHandle {
+  generateFromSchedule: (show: ShowTemplate, schedule: ShowSchedule, fromDate: string, toDate: string) => GenerateResult;
+}
 
 const WEEKDAY_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
@@ -52,13 +64,14 @@ const newSeriesId = () => `series-new-${++seriesSeq}`;
 
 const DEMO_ANCHOR = new Date(weekStartISO);
 
-export function FacilitiesBoard({
-  onVisibleWeekChange,
-  onDerivedShiftsChange,
-}: {
-  onVisibleWeekChange?: (weekDays: { date: string; label: string }[]) => void;
-  onDerivedShiftsChange?: (shifts: Shift[]) => void;
-}) {
+export const FacilitiesBoard = forwardRef<
+  FacilitiesBoardHandle,
+  {
+    onVisibleWeekChange?: (weekDays: { date: string; label: string }[]) => void;
+    onDerivedShiftsChange?: (shifts: Shift[]) => void;
+    onSeedAssignments?: (patch: Assignments, label: string) => void;
+  }
+>(function FacilitiesBoard({ onVisibleWeekChange, onDerivedShiftsChange, onSeedAssignments }, ref) {
   const [events, setEvents] = useState<FacilityEvent[]>(initialFacilityEvents);
   const [selected, setSelected] = useState<FacilityEvent | null>(null);
   const [selectedAnchor, setSelectedAnchor] = useState<DOMRect | null>(null);
@@ -381,6 +394,98 @@ export function FacilitiesBoard({
     return newEvents;
   }
 
+  function hoursBetweenHM(start: string, end: string): number {
+    const [sh, sm] = start.split(':').map(Number);
+    const [eh, em] = end.split(':').map(Number);
+    let hours = eh + em / 60 - (sh + sm / 60);
+    if (hours <= 0) hours += 24;
+    return hours;
+  }
+
+  // A show's standing crew, aggregated by real SkillCode — the same
+  // vocabulary derivedShifts.ts already reads a booking's customCrew
+  // through, so a generated booking turns into roster requirements
+  // exactly like any other custom (no-template) booking would.
+  function crewLinesFromAssignments(assignments: ShowSchedule['crewAssignments']) {
+    const countBySkill = new Map<SkillCode, number>();
+    for (const a of assignments) {
+      const skill = skillCodeForRole(a.role);
+      if (!skill) continue; // unmapped role — skip rather than guess
+      countBySkill.set(skill, (countBySkill.get(skill) ?? 0) + 1);
+    }
+    return Array.from(countBySkill, ([skill, count]) => ({ skill, count }));
+  }
+
+  // The show's named regulars, keyed by the derived shift id each
+  // occurrence will produce (buildDerivedShifts' `derived-${linkedBookingSetId
+  // ?? id}` scheme) — additive only when merged in App, so generating a show
+  // twice, or later editing it, never overwrites a pick made by hand.
+  function namedCrewPatch(assignments: ShowSchedule['crewAssignments'], newEvents: FacilityEvent[], perOccurrence: number): Assignments {
+    const bySkill: Record<string, string[]> = {};
+    for (const a of assignments) {
+      if (!a.regularEmployeeId) continue;
+      const skill = skillCodeForRole(a.role);
+      if (!skill) continue;
+      (bySkill[skill] ??= []).push(a.regularEmployeeId);
+    }
+    const patch: Assignments = {};
+    if (Object.keys(bySkill).length === 0) return patch;
+    for (let i = 0; i < newEvents.length; i += perOccurrence) {
+      const chunk = newEvents.slice(i, i + perOccurrence);
+      const dedupeKey = chunk[0].linkedBookingSetId ?? chunk[0].id;
+      patch[`derived-${dedupeKey}`] = bySkill;
+    }
+    return patch;
+  }
+
+  function weeksBetween(fromDate: string, toDate: string): number {
+    const days = (new Date(`${toDate}T00:00:00`).getTime() - new Date(`${fromDate}T00:00:00`).getTime()) / 86_400_000;
+    return Math.max(1, Math.ceil(days / 7) + 1);
+  }
+
+  // Generates real Studio-board bookings for a show's schedule over a date
+  // range — reusing generateOccurrences/buildEventsForDraft exactly as the
+  // New Booking wizard does, so this is never a second, possibly-diverging
+  // way to create a booking. All-or-nothing on conflicts, same as the
+  // wizard: narrow the range or clear the clash rather than silently
+  // skipping some occurrences.
+  function generateFromSchedule(show: ShowTemplate, schedule: ShowSchedule, fromDate: string, toDate: string): GenerateResult {
+    if (schedule.resourceIds.length === 0) return { created: 0, conflicts: 0, error: 'No facility selected for this show' };
+    const isOneOff = schedule.repeatDays.length === 0;
+    const draft: BookingDraft = {
+      template: null,
+      studio: '',
+      resourceSelection: 'BOTH',
+      date: fromDate,
+      endDate: toDate,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      durationHours: hoursBetweenHM(schedule.startTime, schedule.endTime),
+      title: show.name,
+      production: show.name,
+      client: '',
+      repeatDays: isOneOff ? [] : schedule.repeatDays,
+      repeatWeeks: isOneOff ? 1 : weeksBetween(fromDate, toDate),
+      liveTxStart: schedule.startTime,
+      liveTxEnd: schedule.endTime,
+      excludedCrewRoles: [],
+      customCrew: crewLinesFromAssignments(schedule.crewAssignments),
+    };
+    const occurrences = generateOccurrences(draft);
+    if (occurrences.length === 0) return { created: 0, conflicts: 0 };
+    const conflicting = occurrences.filter((o) => !checkResourcesFree(schedule.resourceIds, o.start, o.end, events).free);
+    if (conflicting.length > 0) return { created: 0, conflicts: conflicting.length };
+
+    const newEvents = buildEventsForDraft(draft, schedule.resourceIds);
+    setEvents((prev) => [...prev, ...newEvents]);
+    const patch = namedCrewPatch(schedule.crewAssignments, newEvents, schedule.resourceIds.length);
+    if (Object.keys(patch).length > 0) onSeedAssignments?.(patch, `Generated bookings for ${show.name}`);
+    showToast(`Generated ${occurrences.length} booking${occurrences.length === 1 ? '' : 's'} for "${show.name}"`);
+    return { created: occurrences.length, conflicts: 0 };
+  }
+
+  useImperativeHandle(ref, () => ({ generateFromSchedule }));
+
   function handleWizardSubmit(draft: BookingDraft, resourceIds: string[]) {
     const occurrences = generateOccurrences(draft);
     const conflicting = occurrences.filter((o) => !checkResourcesFree(resourceIds, o.start, o.end, events).free);
@@ -659,4 +764,4 @@ export function FacilitiesBoard({
       )}
     </div>
   );
-}
+});

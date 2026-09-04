@@ -1,12 +1,26 @@
 import { useState } from 'react';
-import { ChevronLeft, Plus, X } from 'lucide-react';
+import { CalendarPlus, ChevronLeft, Plus, X } from 'lucide-react';
 import type { ShowTemplate } from '../lib/showLibrary';
 import { skillCodeForRole } from '../lib/showLibrary';
 import type { Employee } from '../lib/types';
 import { DAY_LABELS_SHORT, type ShowSchedule, type ShowCrewAssignment } from '../lib/shows';
+import type { GenerateResult } from './facilities/FacilitiesBoard';
 import { allSkillCodes, skillLabel } from '../lib/visuals';
 import { resources } from '../lib/facilityData';
 import { statusColor } from '../lib/visuals';
+
+function todayIso(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+function addMonthsIso(base: string, months: number): string {
+  const d = new Date(`${base}T00:00:00`);
+  d.setMonth(d.getMonth() + months);
+  return d.toISOString().slice(0, 10);
+}
+function daysSummary(days: number[]): string {
+  const order = [1, 2, 3, 4, 5, 6, 0]; // Mon..Sun
+  return order.filter((d) => days.includes(d)).map((d) => DAY_LABELS_SHORT[d]).join('/');
+}
 
 const PALETTE = ['#e8a93c', '#4f9de0', '#8b7ce8', '#e07ca8', '#4dd68c', '#c084fc', '#fbbf24', '#94a3b8'];
 const WEEKDAY_ORDER = [1, 2, 3, 4, 5, 6, 0]; // Mon..Sun, matching the reference layout
@@ -22,6 +36,7 @@ export function ShowDetail({
   onBack,
   onSave,
   onDelete,
+  onGenerate,
 }: {
   show: ShowTemplate;
   employees: Employee[];
@@ -29,10 +44,14 @@ export function ShowDetail({
   onBack: () => void;
   onSave: (updated: ShowSchedule) => void;
   onDelete: () => void;
+  onGenerate: (fromDate: string, toDate: string) => GenerateResult;
 }) {
   const [draft, setDraft] = useState<ShowSchedule>(schedule);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [addingRole, setAddingRole] = useState<string>('');
+  const [genFrom, setGenFrom] = useState(todayIso());
+  const [genTo, setGenTo] = useState(addMonthsIso(todayIso(), 1));
+  const [genResult, setGenResult] = useState<GenerateResult | null>(null);
 
   function save(next: ShowSchedule) {
     setDraft(next);
@@ -205,6 +224,44 @@ export function ShowDetail({
               <input value={draft.project} onChange={(e) => save({ ...draft, project: e.target.value })} placeholder="e.g. Rugby League / Show Name / CODE" className="input" />
             </Field>
           </div>
+
+          <div className="mt-5">
+            <SectionTitle>Generate bookings</SectionTitle>
+            <p className="mt-1 text-[10.5px] leading-snug text-[var(--text-muted)]">
+              Creates real bookings on the Studio board for this schedule — every {isWeekly ? daysSummary(draft.repeatDays) : 'day'} between
+              the dates below — and fills in the regulars set above wherever a slot is still open.
+            </p>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <Field label="From">
+                <input type="date" value={genFrom} onChange={(e) => setGenFrom(e.target.value)} className="input" />
+              </Field>
+              <Field label="To">
+                <input type="date" value={genTo} onChange={(e) => setGenTo(e.target.value)} className="input" />
+              </Field>
+            </div>
+            <button
+              onClick={() => setGenResult(onGenerate(genFrom, genTo))}
+              disabled={draft.resourceIds.length === 0}
+              className="mt-2 flex items-center gap-1.5 rounded-md px-3 py-1.5 font-mono text-[10.5px] font-semibold disabled:opacity-30"
+              style={{ backgroundColor: 'var(--tally)', color: 'var(--ink)' }}
+            >
+              <CalendarPlus size={13} /> Generate
+            </button>
+            {draft.resourceIds.length === 0 && (
+              <p className="mt-1.5 text-[10.5px] text-[var(--text-muted)]">Pick a facility above first.</p>
+            )}
+            {genResult && (
+              <p className="mt-1.5 text-[10.5px]" style={{ color: genResult.created > 0 ? statusColor.ok : statusColor.warning }}>
+                {genResult.error
+                  ? genResult.error
+                  : genResult.created > 0
+                    ? `Created ${genResult.created} booking${genResult.created === 1 ? '' : 's'}.`
+                    : genResult.conflicts > 0
+                      ? `Blocked — ${genResult.conflicts} occurrence${genResult.conflicts === 1 ? '' : 's'} conflict with an existing booking.`
+                      : 'No occurrences in that date range.'}
+              </p>
+            )}
+          </div>
         </div>
 
         <div>
@@ -274,7 +331,8 @@ export function ShowDetail({
             </div>
           )}
           <p className="mt-3 text-[10.5px] leading-snug text-[var(--text-muted)]">
-            This is the standing plan for who normally covers each position — it doesn't yet auto-fill bookings made from this show; use it as a staffing reference when reviewing the roster.
+            This is the standing plan for who normally covers each position — Generate bookings below fills open roster slots with
+            these regulars automatically; a position with nobody set is left open for the freelance pool.
           </p>
         </div>
       </div>

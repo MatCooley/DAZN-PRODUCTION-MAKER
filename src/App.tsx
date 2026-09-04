@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Clapperboard, Users } from 'lucide-react';
 import { DndContext, DragOverlay, type DragEndEvent, type DragStartEvent } from '@dnd-kit/core';
 import { employees as initialEmployees, shifts as staticShifts, initialAssignments, days as initialRosterDays } from './lib/data';
@@ -15,7 +15,7 @@ import { EmployeeChip } from './components/EmployeeChip';
 import { EmployeeProfileModal } from './components/EmployeeProfileModal';
 import { CrewPanel } from './components/CrewPanel';
 import { ShowsPanel } from './components/ShowsPanel';
-import { FacilitiesBoard } from './components/facilities/FacilitiesBoard';
+import { FacilitiesBoard, type FacilitiesBoardHandle, type GenerateResult } from './components/facilities/FacilitiesBoard';
 import { SplitPane, type SplitLayoutMode } from './components/SplitPane';
 import { LayoutModeSwitcher } from './components/LayoutModeSwitcher';
 
@@ -58,6 +58,7 @@ export default function App() {
   const [showSchedules, setShowSchedules] = useState<Record<string, ShowSchedule>>({});
   const [hiddenShowKeys, setHiddenShowKeys] = useState<Set<string>>(new Set());
   const [showsPanelOpen, setShowsPanelOpen] = useState(false);
+  const facilitiesBoardRef = useRef<FacilitiesBoardHandle>(null);
 
   // Hand-authored shifts (real historical roster data) always win over a
   // booking-derived one for the SAME production on the SAME day, so a real
@@ -239,6 +240,29 @@ export default function App() {
     setHiddenShowKeys((prev) => new Set(prev).add(key));
   }
 
+  // Fills in newly-generated bookings' named crew without ever clobbering
+  // a pick already made by hand — merges each skill's employee ids into
+  // whatever's already assigned to that shift, adding only what's missing.
+  function handleSeedAssignments(patch: Assignments, label: string) {
+    pushHistory(label, assignments);
+    setAssignments((prev) => {
+      const next = { ...prev };
+      for (const [shiftId, bySkill] of Object.entries(patch)) {
+        const merged = { ...(next[shiftId] ?? {}) };
+        for (const [skill, ids] of Object.entries(bySkill)) {
+          const existing = merged[skill] ?? [];
+          merged[skill] = [...existing, ...ids.filter((id) => !existing.includes(id))];
+        }
+        next[shiftId] = merged;
+      }
+      return next;
+    });
+  }
+
+  function handleGenerateBookings(show: ShowTemplate, schedule: ShowSchedule, fromDate: string, toDate: string): GenerateResult {
+    return facilitiesBoardRef.current?.generateFromSchedule(show, schedule, fromDate, toDate) ?? { created: 0, conflicts: 0, error: 'Studio board not ready yet' };
+  }
+
   function handleResetRoster() {
     if (Object.keys(assignments).length === 0) return;
     pushHistory('Reset roster', assignments);
@@ -272,7 +296,14 @@ export default function App() {
         <SplitPane
           defaultTopPct={55}
           mode={layoutMode}
-          top={<FacilitiesBoard onVisibleWeekChange={setRosterDays} onDerivedShiftsChange={setDerivedShifts} />}
+          top={
+            <FacilitiesBoard
+              ref={facilitiesBoardRef}
+              onVisibleWeekChange={setRosterDays}
+              onDerivedShiftsChange={setDerivedShifts}
+              onSeedAssignments={handleSeedAssignments}
+            />
+          }
           bottom={
             <div className="flex h-full min-h-0 flex-col">
               <RosterToolbar
@@ -352,6 +383,7 @@ export default function App() {
           onUpdateSchedule={handleUpdateShowSchedule}
           onAddCustomShow={handleAddCustomShow}
           onHideShow={handleHideShow}
+          onGenerate={handleGenerateBookings}
         />
       )}
     </DndContext>
