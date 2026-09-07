@@ -1208,21 +1208,58 @@ const rosterDocRef = doc(db, 'app', 'rosterState');
 /* ============================================================
    1. REFERENCE DATA
    ============================================================ */
-/* Grouped by studio, not by room type, so a floor and its control room
-   always sit together — that's how they're actually booked and walked. */
-/* Room codes match the ones on the ScheduALL work orders, since those
-   are what the crew read on a call sheet. */
+/* Grouped the way ScheduALL actually lists these resources — by room
+   type across the whole facility, not by studio — so this reads the
+   same as the real work orders. The ids below the old fl-a/cr-a/
+   fl-b/cr-b studio codes still resolve (aliased onto ART A/B's floor
+   and control room) so every existing booking keeps its room. */
 const FACILITIES = [
-  { id:'fl-a', name:'Studio A Floor',        short:'A Floor',   code:'ST A FL', label:'Floor',        group:'Studio A' },
-  { id:'cr-a', name:'Studio A Control Room', short:'A Control', code:'ST A CR', label:'Control room', group:'Studio A' },
-  { id:'fl-b', name:'Studio B Floor',        short:'B Floor',   code:'ST B FL', label:'Floor',        group:'Studio B' },
-  { id:'cr-b', name:'Studio B Control Room', short:'B Control', code:'ST B CR', label:'Control room', group:'Studio B' },
-  { id:'fl-c', name:'Studio C Floor',        short:'C Floor',   code:'ST C FL', label:'Floor',        group:'Studio C' },
-  { id:'cr-c', name:'Studio C Control Room', short:'C Control', code:'ST C CR', label:'Control room', group:'Studio C' },
-  { id:'fl-d', name:'Studio D Floor',        short:'D Floor',   code:'ST D FL', label:'Floor',        group:'Studio D' },
-  { id:'thr',  name:'Theatre',               short:'Theatre',   code:'THTR',    label:'Theatre',      group:'Theatre' },
+  { id:'eg-20', name:'EG 20', short:'EG 20', code:'EG 20', label:'Edit Suite', group:'Edit Suites' },
+  { id:'eg-21', name:'EG 21', short:'EG 21', code:'EG 21', label:'Edit Suite', group:'Edit Suites' },
+  { id:'eg-22', name:'EG 22', short:'EG 22', code:'EG 22', label:'Edit Suite', group:'Edit Suites' },
+  { id:'eg-23', name:'EG 23', short:'EG 23', code:'EG 23', label:'Edit Suite', group:'Edit Suites' },
+  { id:'eg-24', name:'EG 24', short:'EG 24', code:'EG 24', label:'Edit Suite', group:'Edit Suites' },
+  { id:'eg-25', name:'EG 25', short:'EG 25', code:'EG 25', label:'Edit Suite', group:'Edit Suites' },
+  { id:'eg-31', name:'EG 31', short:'EG 31', code:'EG 31', label:'Edit Suite', group:'Edit Suites' },
+  { id:'eg-30', name:'EG 30', short:'EG 30', code:'EG 30', label:'Edit Suite', group:'Edit Suites' },
+  { id:'eg-29', name:'EG 29', short:'EG 29', code:'EG 29', label:'Edit Suite', group:'Edit Suites' },
+  { id:'eg-28', name:'EG 28', short:'EG 28', code:'EG 28', label:'Edit Suite', group:'Edit Suites' },
+  { id:'eg-27', name:'EG 27', short:'EG 27', code:'EG 27', label:'Edit Suite', group:'Edit Suites' },
+  { id:'eg-26', name:'EG 26', short:'EG 26', code:'EG 26', label:'Edit Suite', group:'Edit Suites' },
+  { id:'e-140', name:'E 140', short:'E 140', code:'E 140', label:'Edit Suite', group:'Edit Suites' },
+  { id:'e-141', name:'E 141', short:'E 141', code:'E 141', label:'Edit Suite', group:'Edit Suites' },
+  { id:'e-143', name:'E 143', short:'E 143', code:'E 143', label:'Edit Suite', group:'Edit Suites' },
+  { id:'el-00', name:'EL 00', short:'EL 00', code:'EL 00', label:'Edit Suite', group:'Edit Suites' },
+  { id:'el-01', name:'EL 01', short:'EL 01', code:'EL 01', label:'Edit Suite', group:'Edit Suites' },
+  { id:'el-02', name:'EL 02', short:'EL 02', code:'EL 02', label:'Edit Suite', group:'Edit Suites' },
+  { id:'el-03', name:'EL 03', short:'EL 03', code:'EL 03', label:'Edit Suite', group:'Edit Suites' },
+
+  { id:'ap-1', name:'AP 1', short:'AP 1', code:'AP 1', label:'Audio Post', group:'Audio Post' },
+  { id:'ap-2', name:'AP 2', short:'AP 2', code:'AP 2', label:'Audio Post', group:'Audio Post' },
+  { id:'ap-3', name:'AP 3', short:'AP 3', code:'AP 3', label:'Audio Post', group:'Audio Post' },
+  { id:'ap-4', name:'AP 4', short:'AP 4', code:'AP 4', label:'Audio Post', group:'Audio Post' },
+  { id:'ap-5', name:'AP 5', short:'AP 5', code:'AP 5', label:'Audio Post', group:'Audio Post' },
+
+  { id:'vo-1',         name:'VO 1',            short:'VO 1',    code:'VO 1',   label:'Voice Over', group:'Voice Over' },
+  { id:'vo-self-serve', name:'VO - Self Serve', short:'VO Self', code:'VO SS', label:'Voice Over', group:'Voice Over' },
+
+  { id:'art-a', name:'ART A (Clive Churchhill)', short:'ART A', code:'ART A', label:'Floor', group:'Studio Floor' },
+  { id:'art-b', name:'ART B (Alan Border)',       short:'ART B', code:'ART B', label:'Floor', group:'Studio Floor' },
+  { id:'art-c', name:'ART C (Mark Skaife)',       short:'ART C', code:'ART C', label:'Floor', group:'Studio Floor' },
+  { id:'art-d', name:'ART D',                     short:'ART D', code:'ART D', label:'Floor', group:'Studio Floor' },
+
+  { id:'theatre-otc', name:'Theatre (OTC)', short:'Theatre', code:'OTC', label:'Theatre', group:'Theatre' },
+
+  { id:'art-a-ctrl', name:'ART A Control Room', short:'A Control', code:'ART A CTRL', label:'Control room', group:'Studio Control' },
+  { id:'art-b-ctrl', name:'ART B Control Room', short:'B Control', code:'ART B CTRL', label:'Control room', group:'Studio Control' },
+  { id:'art-c-ctrl', name:'ART C Control Room', short:'C Control', code:'ART C CTRL', label:'Control room', group:'Studio Control' },
 ];
-const FAC_GROUPS = ['Studio A','Studio B','Studio C','Studio D','Theatre'];
+const FAC_GROUPS = ['Edit Suites','Audio Post','Voice Over','Studio Floor','Theatre','Studio Control'];
+/* The demo/original ids this file (and every booking made before this
+   import) used — aliased onto their real ART A/B equivalents so nothing
+   already booked goes dangling. New bookings should use the real ids
+   above directly. */
+const FACILITY_ALIASES = { 'fl-a':'art-a', 'cr-a':'art-a-ctrl', 'fl-b':'art-b', 'cr-b':'art-b-ctrl', 'fl-c':'art-c', 'cr-c':'art-c-ctrl', 'fl-d':'art-d', 'thr':'theatre-otc' };
 
 const DEPARTMENTS = [
   { id:'cam',   name:'Camera' },
@@ -1900,8 +1937,8 @@ const SEASON = { start:'2026-03-01', end:'2026-10-01' };
 /* Shorthands for the two studios these shows live in. STB is Studio B
    floor and control, STA is Studio A floor and control — both halves
    are held, since a show in the studio holds the gallery with it. */
-const STB = ['fl-b','cr-b'];
-const STA = ['fl-a','cr-a'];
+const STB = ['art-b','art-b-ctrl'];
+const STA = ['art-a','art-a-ctrl'];
 
 /* One seat on the standing crew: the role, who normally fills it
    (null means it goes to the freelance pool each week), and call and
@@ -2242,7 +2279,10 @@ function seedAiring(sh, date){
 const $  = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
 const byId = (a,id)=>a.find(x=>x.id===id);
-const facility = id=>byId(FACILITIES,id);
+/* Resolves through FACILITY_ALIASES first so a booking's old fl-a/
+   cr-a/etc id — from before the real room import — still finds its
+   room instead of coming back empty. */
+const facility = id=>byId(FACILITIES,id) || (FACILITY_ALIASES[id] ? byId(FACILITIES, FACILITY_ALIASES[id]) : undefined);
 /* Fallbacks for dept/role/person: a shift or day-off can outlive the
    crew member or position it names (a staff import that replaces the
    roster, a role retired from ROLES) — every caller already treats
@@ -5766,7 +5806,7 @@ const longDate = iso =>{
    that is the resource the job is actually booked against. */
 function roomCode(b){
   const cr = b.facilityIds.find(f=>facility(f).label==='Control room');
-  return facility(cr || b.facilityIds[0] || 'cr-b').code;
+  return facility(cr || b.facilityIds[0] || 'art-b-ctrl').code;
 }
 const woName = s => s.staffId
   ? esc(person(s.staffId).name) + (person(s.staffId).employment==='freelance' ? ' (F/L)' : '')
