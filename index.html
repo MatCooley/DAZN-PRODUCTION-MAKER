@@ -2679,6 +2679,7 @@ const state = {
   crewDeptFilter:'all',
   crewEmpFilter:'all',
   crewRoleFilter:'all',
+  crewManagerFilter:'all',
   crewOverOnly:false,
   laneMode:'half',       // 'fac' | 'half' | 'crew' — which of the two workspace panes show
 };
@@ -4125,14 +4126,17 @@ function crewStats(){
   const totalWeekHrs = STAFF.reduce((t,p)=>t+weekHours(p.id,state.weekStart),0);
   return { overCount, fulltime, freelance:STAFF.length-fulltime, totalWeekHrs };
 }
+const crewManagers = ()=> [...new Set(STAFF.map(p=>p.manager).filter(Boolean))].sort();
+
 function crewListFiltered(){
   const q = state.crewSearch.trim().toLowerCase();
   return STAFF.filter(p=>{
     if (state.crewDeptFilter!=='all' && p.dept!==state.crewDeptFilter) return false;
     if (state.crewEmpFilter!=='all' && p.employment!==state.crewEmpFilter) return false;
     if (state.crewRoleFilter!=='all' && !p.positions.some(x=>x.roleId===state.crewRoleFilter)) return false;
+    if (state.crewManagerFilter!=='all' && p.manager!==state.crewManagerFilter) return false;
     if (state.crewOverOnly && weekHours(p.id, state.weekStart) <= p.contract) return false;
-    return !q || p.name.toLowerCase().includes(q);
+    return !q || p.name.toLowerCase().includes(q) || (p.payrollId||'').toLowerCase().includes(q);
   });
 }
 
@@ -4144,7 +4148,7 @@ function renderCrewList(){
   $('#crewModalBody').innerHTML = `
     <div class="crewToolbar">
       <label class="search"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6.2" cy="6.2" r="4.2" stroke="currentColor" stroke-width="1.4"/><path d="m9.4 9.4 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
-        <input id="crewSearchInput" type="search" placeholder="Find crew" value="${esc(state.crewSearch)}" aria-label="Find crew"></label>
+        <input id="crewSearchInput" type="search" placeholder="Find crew or payroll ID" value="${esc(state.crewSearch)}" aria-label="Find crew by name or payroll ID"></label>
       <select class="select" id="crewDeptSelect"><option value="all">All departments</option>${DEPARTMENTS.map(d=>`<option value="${d.id}" ${d.id===state.crewDeptFilter?'selected':''}>${d.name}</option>`).join('')}</select>
       <select class="select" id="crewRoleSelect"><option value="all">All positions</option>${ROLES.map(r=>`<option value="${r.id}" ${r.id===state.crewRoleFilter?'selected':''}>${r.name}</option>`).join('')}</select>
       <select class="select" id="crewEmpSelect">
@@ -4152,6 +4156,7 @@ function renderCrewList(){
         <option value="fulltime" ${state.crewEmpFilter==='fulltime'?'selected':''}>Full-time</option>
         <option value="freelance" ${state.crewEmpFilter==='freelance'?'selected':''}>Freelance</option>
       </select>
+      <select class="select" id="crewManagerSelect"><option value="all">All managers</option>${crewManagers().map(m=>`<option value="${esc(m)}" ${m===state.crewManagerFilter?'selected':''}>${esc(m)}</option>`).join('')}</select>
       <label class="chk"><input type="checkbox" id="crewOverChk" ${state.crewOverOnly?'checked':''}> Over hours only</label>
       <span class="crewToolbar__right"><button class="btn btn--primary btn--sm" id="newCrewBtn">${svgPlus} Add crew member</button></span>
     </div>
@@ -4176,6 +4181,7 @@ function renderCrewList(){
   $('#crewDeptSelect').onchange = e=>{ state.crewDeptFilter = e.target.value; renderCrewRows(); };
   $('#crewRoleSelect').onchange = e=>{ state.crewRoleFilter = e.target.value; renderCrewRows(); };
   $('#crewEmpSelect').onchange = e=>{ state.crewEmpFilter = e.target.value; renderCrewRows(); };
+  $('#crewManagerSelect').onchange = e=>{ state.crewManagerFilter = e.target.value; renderCrewRows(); };
   $('#crewOverChk').onchange = e=>{ state.crewOverOnly = e.target.checked; renderCrewList(); };
   $('#crewOverStat').onclick = ()=>{ state.crewOverOnly = !state.crewOverOnly; renderCrewList(); };
   renderCrewRows();
