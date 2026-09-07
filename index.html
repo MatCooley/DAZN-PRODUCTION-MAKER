@@ -3554,7 +3554,7 @@ function inspNewShift(){
               ${sameDay.map(x=>`<option value="${x.id}">${esc(x.name)} (${x.start}–${x.end})</option>`).join('')}</select>
             ${sameDay.length?'':'<div class="empty-note" style="margin-top:6px">Nothing booked on this date yet.</div>'}</div>
           <div class="field"><div class="field__label">Position</div>
-            <select class="select" id="xRole">${ROLES.filter(r=>r.dept===p.dept)
+            <select class="select" id="xRole">${ROLES.filter(r=>r.dept===p.dept || hasRole(p,r.id))
               .map(r=>`<option value="${r.id}" ${r.id===d.roleId?'selected':''}>${r.name}${hasRole(p,r.id)?'':' — not signed off'}</option>`).join('')}</select></div>
           <div class="field__2">
             <div class="field"><div class="field__label">Call</div><input class="tf" inputmode="numeric" maxlength="5" placeholder="00:00" type="text" id="xStart" value="${d.start}"></div>
@@ -4329,7 +4329,7 @@ function renderCrewDetail(){
 
   const posRows = p.positions.length ? p.positions.map((x,i)=>`
       <div class="posRow">
-        <select class="select" data-posrole="${i}">${ROLES.filter(r=>r.dept===p.dept).map(r=>`<option value="${r.id}" ${r.id===x.roleId?'selected':''}>${r.name}</option>`).join('')}</select>
+        <select class="select" data-posrole="${i}">${ROLES.filter(r=>r.dept===p.dept || r.id===x.roleId).map(r=>`<option value="${r.id}" ${r.id===x.roleId?'selected':''}>${r.name}${r.dept===p.dept?'':` (${dept(r.dept).name})`}</option>`).join('')}</select>
         <span class="posRow__prefix">$</span>
         <input class="rateInput" type="number" min="0" step="0.5" data-posrate="${i}" value="${x.rate}">
         <span class="posRow__prefix">/hr</span>
