@@ -1,0 +1,16 @@
+rules_version = '2';
+
+// No Firebase Auth in front of this app yet, so these rules are the only
+// gate on the roster data. Scoped to the one document the app actually
+// reads and writes (app/rosterState) rather than a blanket wildcard, so a
+// stray collection added later doesn't inherit open access by accident.
+// Anyone with the Netlify URL can currently reach this data either way —
+// tightening this properly means adding Auth and switching to
+// `if request.auth != null` (or per-user rules) once that's in place.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /app/rosterState {
+      allow read, write: if true;
+    }
+  }
+}

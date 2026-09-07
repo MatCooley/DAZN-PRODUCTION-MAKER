@@ -1167,7 +1167,28 @@ body.is-resizing-any .wbar:not(.is-resizing){pointer-events:none}
   </div>
 </div>
 
-<script>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
+import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+
+/* The roster's actual data now lives in Firestore, behind one snapshot
+   document — small enough that this app's scale (tens of staff, a
+   season of bookings) stays well under the 1MB document cap, and simple
+   enough not to need a schema migration for a first backend. See the
+   "PERSISTENCE" block near the bottom, after render() exists to hook
+   into. */
+const firebaseConfig = {
+  apiKey: 'AIzaSyCV7Ju9RRupZkFT4Zz7Oq_w08ZDVClP-ao',
+  authDomain: 'dazn-roster-hub.firebaseapp.com',
+  projectId: 'dazn-roster-hub',
+  storageBucket: 'dazn-roster-hub.firebasestorage.app',
+  messagingSenderId: '135857375138',
+  appId: '1:135857375138:web:c98956a88425dfae0fd4fb',
+};
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+const rosterDocRef = doc(db, 'app', 'rosterState');
+
 /* ============================================================
    1. REFERENCE DATA
    ============================================================ */
@@ -5655,6 +5676,86 @@ function restoreSession(){
   document.addEventListener(ev, saveSession, { capture:true, passive:true }));
 
 /* ============================================================
+   13e. PERSISTENCE
+   The roster data itself — everything SESSION above deliberately
+   leaves out. One snapshot document, last-write-wins: good enough for
+   a single coordinator at a time, not yet safe for two people editing
+   the same booking simultaneously (that needs real-time sync, which
+   is a deliberate next step, not an oversight).
+   ============================================================ */
+function snapshotState(){
+  return {
+    staff: STAFF, shows: SHOWS, bookings: BOOKINGS, shifts: SHIFTS,
+    seq: { STAFF_SEQ, SHOW_SEQ, POS_SEQ, BK_SEQ, SH_SEQ },
+  };
+}
+function applyState(data){
+  if (Array.isArray(data.staff)) STAFF = data.staff;
+  if (Array.isArray(data.shows)) SHOWS = data.shows;
+  if (Array.isArray(data.bookings)) BOOKINGS = data.bookings;
+  if (Array.isArray(data.shifts)) SHIFTS = data.shifts;
+  const seq = data.seq || {};
+  if (seq.STAFF_SEQ != null) STAFF_SEQ = seq.STAFF_SEQ;
+  if (seq.SHOW_SEQ != null) SHOW_SEQ = seq.SHOW_SEQ;
+  if (seq.POS_SEQ != null) POS_SEQ = seq.POS_SEQ;
+  if (seq.BK_SEQ != null) BK_SEQ = seq.BK_SEQ;
+  if (seq.SH_SEQ != null) SH_SEQ = seq.SH_SEQ;
+}
+
+let lastPersistedJson = null;
+/* Blocks any write until the initial load has resolved one way or the
+   other — otherwise an early check against this file's baked-in demo
+   data could clobber real Firestore data with stale demo data before
+   the load even comes back. */
+let persistenceReady = false;
+let persisting = false;
+/* Data mutations happen across a couple dozen call sites and several
+   separate modal-specific render functions (renderCrewModal,
+   renderShowEditor, ...), not one central place — rather than chase
+   every call site, this polls the actual state and only writes when
+   something really changed, which is simpler and can't miss a spot. */
+async function checkAndPersist(){
+  if (!persistenceReady || persisting) return;
+  const json = JSON.stringify(snapshotState());
+  if (json === lastPersistedJson) return;
+  persisting = true;
+  try {
+    await setDoc(rosterDocRef, JSON.parse(json));
+    lastPersistedJson = json;
+  } catch (e){ console.error('Roster save failed', e); }
+  finally { persisting = false; }
+}
+setInterval(checkAndPersist, 1500);
+window.addEventListener('beforeunload', ()=>{
+  if (persistenceReady && JSON.stringify(snapshotState()) !== lastPersistedJson) checkAndPersist();
+});
+
+async function loadFromFirestore(){
+  try {
+    const snap = await getDoc(rosterDocRef);
+    if (snap.exists()){
+      applyState(snap.data());
+      lastPersistedJson = JSON.stringify(snapshotState());
+      render();
+    } else {
+      /* First run for this project — seed Firestore from the demo
+         data this file already ships with, so there's something to
+         load next time instead of an empty roster. */
+      const json = JSON.stringify(snapshotState());
+      await setDoc(rosterDocRef, JSON.parse(json));
+      lastPersistedJson = json;
+    }
+    /* Only allow writes once we actually know what's in Firestore —
+       a failed read below leaves this false, so a transient network
+       error doesn't lead to blindly overwriting real data with
+       whatever demo/stale state happens to be sitting in memory. */
+    persistenceReady = true;
+  } catch (e){
+    console.error('Roster load failed — showing local demo data, changes will not be saved this session', e);
+  }
+}
+
+/* ============================================================
    14. BOOT
    ============================================================ */
 $('#deptSelect').innerHTML = `<option value="all">All departments</option>` +
@@ -5668,6 +5769,7 @@ if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matc
 render();
 restoreSession();
 $('#deptSelect').value = state.deptFilter;
+loadFromFirestore();
 </script>
 </body>
 </html>
