@@ -1,6 +1,6 @@
 import { slotOrder } from '../lib/data';
 import type { Assignments, ComplianceFlag, Employee, Shift } from '../lib/types';
-import type { ComplianceResult, DropVerdict } from '../lib/compliance';
+import type { ComplianceResult, CrewStat, DropVerdict } from '../lib/compliance';
 import { nowClock } from '../lib/format';
 import { ShiftCard } from './ShiftCard';
 
@@ -10,6 +10,7 @@ export function Board({
   assignments,
   employeesById,
   compliance,
+  crewStats,
   onRemove,
   getDropVerdict,
 }: {
@@ -18,6 +19,7 @@ export function Board({
   assignments: Assignments;
   employeesById: Map<string, Employee>;
   compliance: ComplianceResult;
+  crewStats: Record<string, CrewStat>;
   onRemove: (shiftId: string, skill: string, employeeId: string) => void;
   getDropVerdict: (shiftId: string, skill: string) => DropVerdict | null;
 }) {
@@ -66,6 +68,7 @@ export function Board({
                 assignments={assignments}
                 employeesById={employeesById}
                 flagsForShift={compliance.assignmentFlags[shift.id] ?? {}}
+                crewStats={crewStats}
                 onRemove={(skill: string, empId: string) => onRemove(shift.id, skill, empId)}
                 getDropVerdict={(skill: string) => getDropVerdict(shift.id, skill)}
               />

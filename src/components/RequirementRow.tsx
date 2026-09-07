@@ -1,6 +1,6 @@
 import { useDroppable } from '@dnd-kit/core';
-import type { ComplianceFlag, Employee, ShiftRequirement } from '../lib/types';
-import type { DropVerdict } from '../lib/compliance';
+import type { ComplianceFlag, Employee, Shift, ShiftRequirement } from '../lib/types';
+import type { CrewStat, DropVerdict } from '../lib/compliance';
 import { skillColor, skillLabel } from '../lib/visuals';
 import { AssignedChip } from './AssignedChip';
 
@@ -25,6 +25,8 @@ const VERDICT_LABEL: Record<DropVerdict, string> = {
 export function RequirementRow({
   shiftId,
   requirement,
+  shift,
+  crewStats,
   assignedEmployees,
   flagsByEmployee,
   onRemove,
@@ -32,6 +34,8 @@ export function RequirementRow({
 }: {
   shiftId: string;
   requirement: ShiftRequirement;
+  shift: Shift;
+  crewStats: Record<string, CrewStat>;
   assignedEmployees: Employee[];
   flagsByEmployee: Record<string, ComplianceFlag[]>;
   onRemove: (employeeId: string) => void;
@@ -65,6 +69,9 @@ export function RequirementRow({
             key={emp.id}
             employee={emp}
             flags={flagsByEmployee[emp.id] ?? []}
+            skill={requirement.skill}
+            shift={shift}
+            stat={crewStats[emp.id]}
             onRemove={() => onRemove(emp.id)}
           />
         ))}

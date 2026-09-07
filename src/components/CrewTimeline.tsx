@@ -1,8 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import type { Assignments, Employee, Shift, SkillCode } from '../lib/types';
 import type { CrewStat } from '../lib/compliance';
 import { allSkillCodes, skillLabel, statusColor } from '../lib/visuals';
 import { formatHM, nowClock } from '../lib/format';
+import { Hovercard, type HovercardRow } from './Hovercard';
+
+const HOVER_DELAY_MS = 140;
+const BAND_WORD: Record<CrewStat['weekBand'], string> = { std: 'on target', extra: 'running long', over: 'over cap' };
 
 function parseHour(t: string): number {
   const [h, m] = t.split(':').map(Number);
@@ -258,9 +262,69 @@ function CrewRow({
   const span = win.end - win.start;
   const nowLeftPct = ((nowHour - win.start) / span) * 100;
 
+  const [nameHoverRect, setNameHoverRect] = useState<DOMRect | null>(null);
+  const [shiftHoverRect, setShiftHoverRect] = useState<DOMRect | null>(null);
+  const [hoveredShift, setHoveredShift] = useState<Shift | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  function scheduleHover(fn: () => void) {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(fn, HOVER_DELAY_MS);
+  }
+  function clearHover() {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = null;
+    setNameHoverRect(null);
+    setShiftHoverRect(null);
+    setHoveredShift(null);
+  }
+
+  const nameHoverRows: HovercardRow[] = stat
+    ? [
+        { key: 'Role', value: `${employee.team} · ${employee.skills.map((s) => skillLabel[s]).join(', ')}` },
+        {
+          key: 'This week',
+          value: `${formatHM(stat.hoursThisWeek)}${stat.isFullTime ? ' of 38h' : ''} · ${BAND_WORD[stat.weekBand]}`,
+        },
+        ...(stat.isFullTime
+          ? [
+              {
+                key: 'Days off',
+                value: stat.rdoOwed
+                  ? `${stat.rdoOwed} owed · ${stat.daysWorkedThisWeek} days worked`
+                  : `${stat.daysWorkedThisWeek} days worked this week`,
+              },
+            ]
+          : []),
+        ...(stat.isFullTime && stat.otSeasonHours > 0
+          ? [{ key: 'Overtime', value: `${formatHM(stat.otSeasonHours)} this season` }]
+          : []),
+        { key: 'Rostered', value: `${shifts.length} shift${shifts.length === 1 ? '' : 's'} in view` },
+        ...(employee.phone ? [{ key: 'Phone', value: employee.phone }] : []),
+        ...(employee.email ? [{ key: 'Email', value: employee.email }] : []),
+      ]
+    : [];
+
   return (
     <>
-      <div className="border-b border-r border-[var(--line)] px-2 py-2">
+      <div
+        className="border-b border-r border-[var(--line)] px-2 py-2"
+        onMouseEnter={(e) => {
+          const rect = e.currentTarget.getBoundingClientRect();
+          scheduleHover(() => setNameHoverRect(rect));
+        }}
+        onMouseLeave={clearHover}
+      >
+        {nameHoverRect && (
+          <Hovercard
+            anchorRect={nameHoverRect}
+            accentColor="var(--tally)"
+            title={employee.name}
+            subtitle={employee.grade}
+            rows={nameHoverRows}
+            warning={stat?.rdoOwed ? `${stat.rdoOwed} RDO owed this week` : undefined}
+          />
+        )}
         <div className="truncate text-[12.5px] font-medium text-[var(--text-primary)]">{employee.name}</div>
         <div className="flex items-center gap-1 font-mono text-[9.5px] text-[var(--text-muted)]">
           {stat?.isFullTime ? `${formatHM(stat.hoursThisWeek)} of 38h` : `${formatHM(stat?.hoursThisWeek ?? 0)}`}
@@ -292,13 +356,35 @@ function CrewRow({
               const left = Math.max(0, ((start - win.start) / span) * 100);
               const width = Math.max(2, ((Math.min(end, win.end) - start) / span) * 100);
               const color = productionColor(s.production);
+              const durationHours = shiftSpan(s).end - shiftSpan(s).start;
               return (
                 <div
                   key={s.id}
-                  title={`${s.start}–${s.end} · ${s.production}`}
+                  onMouseEnter={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    scheduleHover(() => {
+                      setShiftHoverRect(rect);
+                      setHoveredShift(s);
+                    });
+                  }}
+                  onMouseLeave={clearHover}
                   className="absolute top-1 bottom-1 overflow-hidden rounded border px-1.5 py-0.5"
                   style={{ left: `${left}%`, width: `${width}%`, borderColor: color, backgroundColor: `${color}26` }}
                 >
+                  {shiftHoverRect && hoveredShift?.id === s.id && (
+                    <Hovercard
+                      anchorRect={shiftHoverRect}
+                      accentColor={color}
+                      title={s.production}
+                      subtitle={s.slot}
+                      rows={[
+                        { key: 'Call', value: `${day.label} · ${s.start}` },
+                        { key: 'Wrap', value: `${s.end} · ${formatHM(durationHours)} on the clock` },
+                        { key: 'Roles', value: s.requirements.map((r) => `${skillLabel[r.skill]} ×${r.count}`).join(', ') },
+                        ...(stat ? [{ key: 'Week', value: `${formatHM(stat.hoursThisWeek)} rostered` }] : []),
+                      ]}
+                    />
+                  )}
                   <div className="truncate font-medium text-[9.5px] leading-tight" style={{ color }}>
                     {s.production}
                   </div>

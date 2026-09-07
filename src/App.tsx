@@ -340,6 +340,7 @@ export default function App() {
                       assignments={assignments}
                       employeesById={employeesById}
                       compliance={compliance}
+                      crewStats={crewStats}
                       onRemove={handleRemove}
                       getDropVerdict={getDropVerdict}
                     />
