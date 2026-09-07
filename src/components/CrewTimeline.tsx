@@ -161,7 +161,7 @@ export function CrewTimeline({
                 <div className="flex items-baseline gap-1.5">
                   <span
                     className="font-display text-[12px] font-semibold uppercase tracking-wide"
-                    style={{ color: isToday ? 'var(--tally)' : 'var(--text-primary)' }}
+                    style={{ color: 'var(--tally)' }}
                   >
                     {day.label}
                   </span>

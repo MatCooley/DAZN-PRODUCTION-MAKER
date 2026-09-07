@@ -36,7 +36,7 @@ export function RosterTable({
                 <th
                   key={day.date}
                   className="sticky top-0 z-0 border-b border-r border-[var(--line)] bg-[var(--panel)] p-2 text-left font-display text-[11px] font-semibold uppercase tracking-wide"
-                  style={{ color: isToday ? 'var(--tally)' : 'var(--text-primary)' }}
+                  style={{ color: 'var(--tally)' }}
                 >
                   {day.label} <span className="font-mono text-[10px] font-normal text-[var(--text-muted)]">{day.date.slice(8)}</span>
                   {isToday && (

@@ -37,29 +37,26 @@ export function TimeRuler({
           className={`relative shrink-0 border-r border-[var(--line)] ${isToday ? 'bg-[var(--tally)]/10' : ''}`}
           style={{ width: dayWidth }}
         >
-          {clickable ? (
-            <button
-              type="button"
-              onClick={() => onDayClick!(day.date)}
-              title={`Open ${day.label} ${day.date.slice(8)} in Day view`}
-              className="group absolute left-0 top-0 flex h-4 items-center gap-1 rounded-sm px-1.5 transition hover:bg-[var(--tally)]/15"
-            >
-              <span
-                className="font-display text-[11px] font-semibold uppercase tracking-wide group-hover:text-[var(--tally)]"
-                style={{ color: isToday ? 'var(--tally)' : 'var(--text-primary)' }}
+          <div className="absolute left-0 right-0 top-0 flex h-4 items-baseline justify-between px-1.5">
+            {clickable ? (
+              <button
+                type="button"
+                onClick={() => onDayClick!(day.date)}
+                title={`Open ${day.label} ${day.date.slice(8)} in Day view`}
+                className="group flex items-center gap-1 rounded-sm transition"
               >
-                {day.label} <span className="font-mono text-[9px] font-normal text-[var(--text-muted)]">{day.date.slice(8)}</span>
+                <span className="font-display text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tally)' }}>
+                  {day.label}
+                </span>
+                <ZoomIn size={9} className="text-[var(--tally)] opacity-0 transition group-hover:opacity-100" />
+              </button>
+            ) : (
+              <span className="font-display text-[11px] font-semibold uppercase tracking-wide" style={{ color: 'var(--tally)' }}>
+                {day.label}
               </span>
-              <ZoomIn size={9} className="text-[var(--tally)] opacity-0 transition group-hover:opacity-100" />
-            </button>
-          ) : (
-            <div
-              className="absolute left-1.5 top-0.5 font-display text-[11px] font-semibold uppercase tracking-wide"
-              style={{ color: isToday ? 'var(--tally)' : 'var(--text-primary)' }}
-            >
-              {day.label} <span className="font-mono text-[9px] font-normal text-[var(--text-muted)]">{day.date.slice(8)}</span>
-            </div>
-          )}
+            )}
+            <span className="font-mono text-[9px] font-normal text-[var(--text-muted)]">{day.date.slice(8)}</span>
+          </div>
           {tickHours.map((h) => (
             <div
               key={h}

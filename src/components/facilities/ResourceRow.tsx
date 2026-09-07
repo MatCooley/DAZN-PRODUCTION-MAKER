@@ -12,6 +12,7 @@ export function ResourceRow({
   checkValid,
   onDrop,
   onClickEvent,
+  getCrewFill,
 }: {
   resource: Resource;
   events: FacilityEvent[];
@@ -22,6 +23,7 @@ export function ResourceRow({
   checkValid: (event: FacilityEvent, start: Date, end: Date) => boolean;
   onDrop: (id: string, start: Date, end: Date, valid: boolean) => void;
   onClickEvent: (event: FacilityEvent, anchorRect: DOMRect) => void;
+  getCrewFill?: (event: FacilityEvent) => { filled: number; total: number } | null;
 }) {
   const dayWidth = 24 * pxPerHour;
   const trackWidth = dayCount * dayWidth;
@@ -64,6 +66,8 @@ export function ResourceRow({
             hasConflict={conflictIds.has(ev.id)}
             pxPerHour={pxPerHour}
             bookingColor={bookingColor}
+            resourceName={resource.name}
+            crewFill={getCrewFill?.(ev)}
             checkValid={(start, end) => checkValid(ev, start, end)}
             onDrop={onDrop}
             onClick={onClickEvent}

@@ -274,7 +274,7 @@ export default function App() {
   return (
     <DndContext onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
       <div className="flex h-screen flex-col bg-[var(--ink)]">
-        <TopBar>
+        <TopBar days={rosterDays}>
           <div className="flex items-center gap-2">
             <button
               onClick={() => setCrewPanelOpen(true)}
@@ -299,9 +299,11 @@ export default function App() {
           top={
             <FacilitiesBoard
               ref={facilitiesBoardRef}
+              assignments={assignments}
               onVisibleWeekChange={setRosterDays}
               onDerivedShiftsChange={setDerivedShifts}
               onSeedAssignments={handleSeedAssignments}
+              onOpenShows={() => setShowsPanelOpen(true)}
             />
           }
           bottom={

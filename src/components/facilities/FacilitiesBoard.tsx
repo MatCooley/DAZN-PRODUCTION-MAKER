@@ -67,11 +67,13 @@ const DEMO_ANCHOR = new Date(weekStartISO);
 export const FacilitiesBoard = forwardRef<
   FacilitiesBoardHandle,
   {
+    assignments: Assignments;
     onVisibleWeekChange?: (weekDays: { date: string; label: string }[]) => void;
     onDerivedShiftsChange?: (shifts: Shift[]) => void;
     onSeedAssignments?: (patch: Assignments, label: string) => void;
+    onOpenShows?: () => void;
   }
->(function FacilitiesBoard({ onVisibleWeekChange, onDerivedShiftsChange, onSeedAssignments }, ref) {
+>(function FacilitiesBoard({ assignments, onVisibleWeekChange, onDerivedShiftsChange, onSeedAssignments, onOpenShows }, ref) {
   const [events, setEvents] = useState<FacilityEvent[]>(initialFacilityEvents);
   const [selected, setSelected] = useState<FacilityEvent | null>(null);
   const [selectedAnchor, setSelectedAnchor] = useState<DOMRect | null>(null);
@@ -133,6 +135,24 @@ export const FacilitiesBoard = forwardRef<
   useEffect(() => {
     onDerivedShiftsChange?.(buildDerivedShifts(events));
   }, [events, onDerivedShiftsChange]);
+
+  // Same derivation, kept locally too so the hover card can show real
+  // crew-fill counts without waiting on the round trip through App state.
+  const derivedShiftsById = useMemo(() => new Map(buildDerivedShifts(events).map((s) => [s.id, s])), [events]);
+
+  function getCrewFillFor(event: FacilityEvent): { filled: number; total: number } | null {
+    if (event.eventType !== 'BOOKING') return null;
+    const dedupeKey = event.linkedBookingSetId ?? event.id;
+    const shift = derivedShiftsById.get(`derived-${dedupeKey}`);
+    if (!shift) return null;
+    let filled = 0;
+    let total = 0;
+    for (const r of shift.requirements) {
+      total += r.count;
+      filled += (assignments[shift.id]?.[r.skill] ?? []).length;
+    }
+    return { filled, total };
+  }
 
   const buckets: DateBucket[] = useMemo(() => {
     if (viewMode === 'month') return monthDayBuckets(anchor);
@@ -643,7 +663,7 @@ export const FacilitiesBoard = forwardRef<
             ))}
           </div>
           <button
-            onClick={() => setWizardOpen(true)}
+            onClick={() => onOpenShows?.()}
             className="flex items-center gap-1 rounded-md border border-[var(--tally)]/50 bg-[var(--tally)]/10 px-2.5 py-1.5 font-mono text-[10.5px] text-[var(--tally)] transition hover:bg-[var(--tally)]/20"
           >
             <Plus size={12} /> New booking
@@ -698,6 +718,7 @@ export const FacilitiesBoard = forwardRef<
                   setSelected(ev);
                   setSelectedAnchor(rect);
                 }}
+                getCrewFill={getCrewFillFor}
               />
             ))}
           </div>

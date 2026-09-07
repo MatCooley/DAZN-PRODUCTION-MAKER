@@ -44,7 +44,7 @@ export function Board({
             <div className="sticky top-0 z-10 flex items-baseline justify-between bg-[var(--ink)] px-0.5 py-1.5">
               <span
                 className="font-display text-[13px] font-semibold uppercase tracking-wide"
-                style={{ color: isToday ? 'var(--tally)' : 'var(--text-primary)' }}
+                style={{ color: 'var(--tally)' }}
               >
                 {day.label}
               </span>

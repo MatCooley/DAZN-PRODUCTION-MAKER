@@ -4,9 +4,12 @@ import type { FacilityEvent } from '../../lib/facilityTypes';
 import { toLocalDateString } from '../../lib/dateUtils';
 import { SNAP_HOURS, conflictStyle, facilityEventStyle } from '../../lib/facilityVisuals';
 import { showIconFor } from '../../lib/showIcons';
+import { Hovercard, type HovercardRow } from '../Hovercard';
+import { formatHM } from '../../lib/format';
 
 const DRAGGABLE_TYPES = new Set(['BOOKING', 'HOLD', 'MAINTENANCE', 'BLACKOUT']);
 const CLICK_THRESHOLD_PX = 4;
+const HOVER_DELAY_MS = 140;
 
 export function EventBlock({
   event,
@@ -15,6 +18,8 @@ export function EventBlock({
   hasConflict,
   pxPerHour,
   bookingColor,
+  resourceName,
+  crewFill,
   checkValid,
   onDrop,
   onClick,
@@ -25,13 +30,28 @@ export function EventBlock({
   hasConflict: boolean;
   pxPerHour: number;
   bookingColor: { fill: string; border: string; textColor: string };
+  resourceName: string;
+  crewFill?: { filled: number; total: number } | null;
   checkValid: (start: Date, end: Date) => boolean;
   onDrop: (id: string, start: Date, end: Date, valid: boolean) => void;
   onClick: (event: FacilityEvent, anchorRect: DOMRect) => void;
 }) {
   const [drag, setDrag] = useState<{ deltaPx: number; valid: boolean } | null>(null);
+  const [hoverRect, setHoverRect] = useState<DOMRect | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const moved = useRef(0);
   const draggable = DRAGGABLE_TYPES.has(event.eventType);
+
+  function handleMouseEnter(e: React.MouseEvent<HTMLDivElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = setTimeout(() => setHoverRect(rect), HOVER_DELAY_MS);
+  }
+  function handleMouseLeave() {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    hoverTimer.current = null;
+    setHoverRect(null);
+  }
 
   function handleMouseDown(e: React.MouseEvent<HTMLDivElement>) {
     if (!draggable) return;
@@ -89,19 +109,39 @@ export function EventBlock({
   const isAvailability = event.eventType === 'AVAILABILITY_WINDOW';
   const badgeCount = [event.linkedBookingSetId, event.seriesId, event.bookingGroupId].filter(Boolean).length;
   const crossesMidnight = toLocalDateString(new Date(event.start)) !== toLocalDateString(new Date(event.end));
-  // Design idea: the show's real brand icon, revealed on hover rather than
-  // shrunk to fit the bar — these are detailed illustrated marks that only
-  // read at real size, so a tiny persistent badge would just blur them out.
+  // Design idea: the show's real brand icon, shown in the hovercard header
+  // rather than shrunk to fit the bar — these are detailed illustrated
+  // marks that only read at real size, so a tiny persistent badge would
+  // just blur them out.
   const showIcon = event.eventType === 'BOOKING' ? showIconFor(event.showKey, event.title ?? event.production) : undefined;
+
+  const durationHours = (new Date(event.end).getTime() - new Date(event.start).getTime()) / 3_600_000;
+  const hoverRows: HovercardRow[] = [
+    {
+      key: 'When',
+      value: `${event.start.slice(0, 10)} · ${event.start.slice(11, 16)}–${event.end.slice(11, 16)} · ${formatHM(durationHours)}`,
+    },
+    { key: 'Where', value: resourceName },
+  ];
+  if (event.client) hoverRows.push({ key: 'Client', value: event.client });
+  if (event.production && event.production !== event.title) hoverRows.push({ key: 'Production', value: event.production });
+  if (crewFill && crewFill.total > 0) {
+    hoverRows.push({
+      key: 'Crew',
+      value: `${crewFill.filled} of ${crewFill.total} filled${crewFill.filled < crewFill.total ? ` · ${crewFill.total - crewFill.filled} open` : ''}`,
+    });
+  }
 
   return (
     <div
       onMouseDown={handleMouseDown}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
       onClick={(e) => {
         if (isAvailability) onClick(event, e.currentTarget.getBoundingClientRect());
         e.stopPropagation();
       }}
-      className={`group absolute top-1.5 flex items-center gap-1 rounded-[4px] border px-1.5 transition-shadow
+      className={`absolute top-1.5 flex items-center gap-1 rounded-[4px] border px-1.5 transition-shadow
         ${draggable ? 'cursor-grab active:cursor-grabbing' : isAvailability ? 'cursor-pointer' : 'cursor-default'}
         ${drag ? 'z-20 shadow-lg' : 'z-0'}`}
       style={{
@@ -114,15 +154,17 @@ export function EventBlock({
         borderWidth: dragInvalid ? 2 : 1,
         opacity: isAvailability ? 0.7 : 1,
       }}
-      title={`${event.title ?? event.eventType} — ${event.start.slice(11, 16)}–${event.end.slice(11, 16)}${crossesMidnight ? ' (continues into the next day)' : ''}`}
     >
-      {showIcon && !drag && (
-        <div className="pointer-events-none absolute bottom-full left-1/2 z-50 mb-1.5 hidden -translate-x-1/2 flex-col items-center gap-1 rounded-lg border border-[var(--line)] bg-[var(--panel-raised)] p-2 shadow-2xl group-hover:flex">
-          <img src={showIcon} alt="" className="h-16 w-16 rounded-full" />
-          <span className="max-w-[140px] truncate font-mono text-[10px] font-medium text-[var(--text-primary)]">
-            {event.title}
-          </span>
-        </div>
+      {hoverRect && !drag && (
+        <Hovercard
+          anchorRect={hoverRect}
+          accentColor={style.border}
+          icon={showIcon ? <img src={showIcon} alt="" className="h-6 w-6 shrink-0 rounded-full object-cover" /> : undefined}
+          title={event.title ?? (isAvailability ? 'Available' : event.eventType)}
+          subtitle={event.status === 'HELD' ? 'Held' : event.status === 'CONFIRMED' ? 'Confirmed' : undefined}
+          rows={hoverRows}
+          warning={showConflict ? 'Clashes with another booking on this resource' : undefined}
+        />
       )}
       {badgeCount > 0 && (
         <span className="flex shrink-0 items-center gap-0.5 opacity-80">
