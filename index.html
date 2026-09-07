@@ -1170,6 +1170,7 @@ body.is-resizing-any .wbar:not(.is-resizing){pointer-events:none}
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-app.js';
 import { getFirestore, doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-firestore.js';
+import { getAuth, signInAnonymously } from 'https://www.gstatic.com/firebasejs/12.4.0/firebase-auth.js';
 
 /* The roster's actual data now lives in Firestore, behind one snapshot
    document — small enough that this app's scale (tens of staff, a
@@ -1187,6 +1188,7 @@ const firebaseConfig = {
 };
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
+const auth = getAuth(firebaseApp);
 const rosterDocRef = doc(db, 'app', 'rosterState');
 
 /* ============================================================
@@ -5730,6 +5732,13 @@ window.addEventListener('beforeunload', ()=>{
   if (persistenceReady && JSON.stringify(snapshotState()) !== lastPersistedJson) checkAndPersist();
 });
 
+/* Firestore rules require request.auth != null, so this has to resolve
+   before the first read — silent and invisible, no login screen, just
+   enough to keep the roster off the open internet. */
+async function ensureAuth(){
+  await signInAnonymously(auth);
+}
+
 async function loadFromFirestore(){
   try {
     const snap = await getDoc(rosterDocRef);
@@ -5769,7 +5778,7 @@ if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matc
 render();
 restoreSession();
 $('#deptSelect').value = state.deptFilter;
-loadFromFirestore();
+ensureAuth().then(loadFromFirestore).catch(e=>console.error('Roster auth failed — showing local demo data, changes will not be saved this session', e));
 </script>
 </body>
 </html>

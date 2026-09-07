@@ -1,16 +1,15 @@
 rules_version = '2';
 
-// No Firebase Auth in front of this app yet, so these rules are the only
-// gate on the roster data. Scoped to the one document the app actually
-// reads and writes (app/rosterState) rather than a blanket wildcard, so a
-// stray collection added later doesn't inherit open access by accident.
-// Anyone with the Netlify URL can currently reach this data either way —
-// tightening this properly means adding Auth and switching to
-// `if request.auth != null` (or per-user rules) once that's in place.
+// Gated on Firebase Anonymous Auth (silent — no login screen, the app
+// signs everyone in automatically). This isn't per-user access control,
+// just a floor that keeps the data off the open internet: a browser has
+// to actually load and run the app's Firebase SDK to get a token before
+// Firestore will talk to it, unlike the earlier `if true` rule anyone
+// with curl could read or write against directly.
 service cloud.firestore {
   match /databases/{database}/documents {
     match /app/rosterState {
-      allow read, write: if true;
+      allow read, write: if request.auth != null;
     }
   }
 }
