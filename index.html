@@ -280,6 +280,9 @@ button{background:none;border:0;cursor:pointer}
 
 /* ---------- workspace split ---------- */
 .workspace{display:grid;grid-template-rows:var(--top-h) 7px 1fr;min-height:0;background:var(--bg);margin-top:14px}
+.workspace.mode-fac,.workspace.mode-crew{grid-template-rows:1fr}
+.workspace.mode-fac #splitter,.workspace.mode-fac #crewPane,
+.workspace.mode-crew #splitter,.workspace.mode-crew #facPane{display:none}
 .pane{display:flex;flex-direction:column;min-height:0}
 .panehead{display:flex;align-items:center;gap:12px;padding:7px 14px;background:var(--surface-2);border-bottom:1px solid var(--line);flex:none}
 .panehead__title{font-family:var(--wide);font-weight:700;font-size:var(--t-sm);letter-spacing:.04em}
@@ -640,9 +643,13 @@ body.is-resizing-any .wbar:not(.is-resizing){pointer-events:none}
 
 .crewToolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 18px;border-bottom:1px solid var(--line-soft)}
 .crewToolbar__right{margin-left:auto;display:flex;gap:8px}
+.crewToolbar .chk{display:flex;align-items:center;gap:6px;font-size:var(--t-md);color:var(--text-2);cursor:pointer;white-space:nowrap}
+.crewToolbar .chk input{accent-color:var(--sel)}
 
 .statStrip{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;padding:14px 18px;border-bottom:1px solid var(--line-soft)}
 .statCard{padding:10px 12px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface-2)}
+.statCard--btn{display:block;width:100%;text-align:left;cursor:pointer;font:inherit;color:inherit}
+.statCard--btn[aria-pressed="true"]{border-color:var(--sel);background:var(--surface-3)}
 .statCard__n{font-variant-numeric:tabular-nums;font-size:var(--t-2xl);font-weight:700;letter-spacing:-.01em}
 .statCard__n.is-warn{color:var(--soft)}
 .statCard__l{font-size:var(--t-xs);color:var(--text-3);margin-top:1px}
@@ -1039,6 +1046,11 @@ body.is-resizing-any .wbar:not(.is-resizing){pointer-events:none}
         <button id="viewWeek" aria-pressed="true">Week</button>
         <button id="viewMonth" aria-pressed="false">Month</button>
       </div>
+      <div class="segmented roster-only" role="group" aria-label="Layout">
+        <button id="layoutFac" aria-pressed="false">Facilities</button>
+        <button id="layoutHalf" aria-pressed="true">Half / Half</button>
+        <button id="layoutCrew" aria-pressed="false">Crew</button>
+      </div>
       <button class="today-btn roster-only" id="todayBtn">Today</button>
 
       <span class="tb-push"></span>
@@ -1053,7 +1065,7 @@ body.is-resizing-any .wbar:not(.is-resizing){pointer-events:none}
 
   </header>
 
-  <div class="toolbar">
+  <div class="toolbar" style="display:none">
     <span class="tb-side tb-side--l"></span>
 
     <div class="search" id="searchWrap">
@@ -1070,7 +1082,7 @@ body.is-resizing-any .wbar:not(.is-resizing){pointer-events:none}
   </div>
 
   <div class="workspace" id="workspace">
-    <section class="pane" aria-label="Facility schedule">
+    <section class="pane" id="facPane" aria-label="Facility schedule">
       <div class="panehead">
         <span class="panehead__title">Facilities</span>
         <span class="panehead__meta" id="facMeta"></span>
@@ -1087,7 +1099,7 @@ body.is-resizing-any .wbar:not(.is-resizing){pointer-events:none}
 
     <div class="splitter" id="splitter" role="separator" aria-orientation="horizontal" tabindex="0" aria-label="Resize panes"></div>
 
-    <section class="pane" aria-label="Crew roster">
+    <section class="pane" id="crewPane" aria-label="Crew roster">
       <div class="panehead">
         <span class="panehead__title">Crew</span>
         <select class="select" id="deptSelect" aria-label="Department"></select>
@@ -1220,6 +1232,8 @@ const DEPARTMENTS = [
   { id:'light', name:'Lighting' },
   { id:'pres',  name:'Presentation' },
   { id:'eng',   name:'Engineering' },
+  { id:'edit',  name:'Editing' },
+  { id:'stage', name:'Staging' },
 ];
 
 /* Position names are the ones ScheduALL prints in the Description
@@ -1250,6 +1264,15 @@ const ROLES = [
   { id:'tech-dir',  dept:'eng',   name:'Technical Director' },
   { id:'bc-eng',    dept:'eng',   name:'Broadcast Engineer' },
   { id:'net-eng',   dept:'eng',   name:'Network Engineer' },
+  { id:'jib',       dept:'cam',   name:'Jib Operator' },
+  { id:'light-op',  dept:'light', name:'Lighting Operator' },
+  { id:'prod-asst', dept:'prod',  name:'Production Assistant' },
+  { id:'prod-mgr',  dept:'prod',  name:'Production & Studio Manager' },
+  { id:'editor',    dept:'edit',  name:'Editor' },
+  { id:'edit-sup',  dept:'edit',  name:'Edit Supervisor' },
+  { id:'edit-mgr',  dept:'edit',  name:'Edit Manager' },
+  { id:'stagehand', dept:'stage', name:'Stagehand' },
+  { id:'staging-mgr', dept:'stage', name:'Staging Manager' },
 ];
 
 /* Positions carry their own hourly rate, since one person can be paid
@@ -1262,128 +1285,567 @@ const ROLES = [
 function pos(roleId, rate){ return { roleId, rate }; }
 
 let STAFF = [
-  { id:'s01', name:'Dan Kirby',        dept:'cam',   contract:38, employment:'fulltime',
-    positions:[pos('cam',62), pos('rf-cam',71), pos('sted',68)],
-    email:'dan.kirby@daznproduction.com.au', phone:'0412 208 331' },
-  { id:'s02', name:'Priya Raman',      dept:'cam',   contract:38, employment:'fulltime',
-    positions:[pos('cam',62), pos('cam-sup',83)],
-    email:'priya.raman@daznproduction.com.au', phone:'0413 552 970' },
-  { id:'s03', name:'Josh Whelan',      dept:'cam',   contract:30, employment:'freelance',
-    positions:[pos('cam',70), pos('sted',76)],
-    email:'josh.whelan@icloud.com', phone:'0421 774 108' },
-  { id:'s04', name:'Mia Torres',       dept:'cam',   contract:38, employment:'fulltime',
-    positions:[pos('cam',62), pos('rf-cam',71)],
-    email:'mia.torres@daznproduction.com.au', phone:'0466 320 815' },
-  { id:'s22', name:'Tessa Bright',     dept:'cam',   contract:38, employment:'fulltime',
-    positions:[pos('cam',62), pos('sted',68)],
-    email:'tessa.bright@daznproduction.com.au', phone:'0433 190 447' },
-  { id:'s23', name:'Nick Alvarez',     dept:'cam',   contract:38, employment:'fulltime',
-    positions:[pos('cam',62), pos('rf-cam',71), pos('cam-sup',83)],
-    email:'nick.alvarez@daznproduction.com.au', phone:'0407 662 519' },
-
-  { id:'s05', name:'Ellie Novak',      dept:'aud',   contract:38, employment:'fulltime',
-    positions:[pos('aud-dir',66), pos('aud-asst',58)],
-    email:'ellie.novak@daznproduction.com.au', phone:'0410 887 233' },
-  { id:'s06', name:'Sam Okafor',       dept:'aud',   contract:38, employment:'fulltime',
-    positions:[pos('aud-dir',66), pos('aud-asst',58), pos('comms',61)],
-    email:'sam.okafor@daznproduction.com.au', phone:'0402 771 588' },
-  { id:'s07', name:'Rhys Donnelly',    dept:'aud',   contract:24, employment:'freelance',
-    positions:[pos('aud-asst',64), pos('comms',66)],
-    email:'rhys.donnelly@gmail.com', phone:'0438 019 226' },
-  { id:'s24', name:'Oscar Lindqvist',  dept:'aud',   contract:38, employment:'fulltime',
-    positions:[pos('aud-dir',66), pos('aud-asst',58)],
-    email:'oscar.lindqvist@daznproduction.com.au', phone:'0417 300 942' },
-
-  { id:'s08', name:'Grace Lam',        dept:'vis',   contract:38, employment:'fulltime',
-    positions:[pos('switcher',79), pos('vis-sup',89)],
-    email:'grace.lam@daznproduction.com.au', phone:'0404 619 375' },
-  { id:'s09', name:'Tomas Berg',       dept:'vis',   contract:38, employment:'fulltime',
-    positions:[pos('switcher',79)],
-    email:'tomas.berg@daznproduction.com.au', phone:'0429 553 810' },
-  { id:'s21', name:'Iris Okonkwo',     dept:'vis',   contract:30, employment:'fulltime',
-    positions:[pos('switcher',79)],
-    email:'iris.okonkwo@daznproduction.com.au', phone:'0426 884 137' },
-
-  { id:'s10', name:'Nadia Haddad',     dept:'evs',   contract:38, employment:'fulltime',
-    positions:[pos('evs',65), pos('evs-sup',81)],
-    email:'nadia.haddad@daznproduction.com.au', phone:'0414 726 093' },
-  { id:'s11', name:'Ben Castellano',   dept:'evs',   contract:38, employment:'fulltime',
-    positions:[pos('evs',65)],
-    email:'ben.castellano@daznproduction.com.au', phone:'0435 208 764' },
-  { id:'s12', name:'Owen Pryce',       dept:'evs',   contract:30, employment:'freelance',
-    positions:[pos('evs',72)],
-    email:'owen.pryce@outlook.com', phone:'0448 331 570' },
-
-  { id:'s13', name:'Kate Sullivan',    dept:'prod',  contract:38, employment:'fulltime',
-    positions:[pos('dir',112), pos('prod',93)],
-    email:'kate.sullivan@daznproduction.com.au', phone:'0409 114 682' },
-  { id:'s14', name:'Marcus Ilori',     dept:'prod',  contract:38, employment:'fulltime',
-    positions:[pos('dir',112), pos('prod',93)],
-    email:'marcus.ilori@daznproduction.com.au', phone:'0423 907 441' },
-  { id:'s15', name:'Aroha Ngata',      dept:'prod',  contract:38, employment:'fulltime',
-    positions:[pos('fm',67), pos('fm-aa',69)],
-    email:'aroha.ngata@daznproduction.com.au', phone:'0431 665 209' },
-  { id:'s20', name:'Hana Petrov',      dept:'prod',  contract:38, employment:'fulltime',
-    positions:[pos('fm',67), pos('fm-aa',69)],
-    email:'hana.petrov@daznproduction.com.au', phone:'0416 442 318' },
-  { id:'s25', name:'Elena Marsh',      dept:'prod',  contract:38, employment:'fulltime',
-    positions:[pos('prod',93), pos('da',61)],
-    email:'elena.marsh@daznproduction.com.au', phone:'0405 771 260' },
-  { id:'s26', name:'Toby Kerrigan',    dept:'prod',  contract:38, employment:'fulltime',
-    positions:[pos('prod',93), pos('da',61)],
-    email:'toby.kerrigan@daznproduction.com.au', phone:'0427 018 553' },
-  { id:'s27', name:'Sione Fifita',     dept:'prod',  contract:38, employment:'fulltime',
-    positions:[pos('da',61), pos('fm-aa',69)],
-    email:'sione.fifita@daznproduction.com.au', phone:'0432 806 174' },
-  { id:'s28', name:'Bridget Nolan',    dept:'prod',  contract:24, employment:'freelance',
-    positions:[pos('da',66), pos('fm-aa',72)],
-    email:'bridget.nolan@gmail.com', phone:'0413 927 605' },
-
-  { id:'s16', name:'Yuki Tanaka',      dept:'gfx',   contract:38, employment:'fulltime',
-    positions:[pos('viz',59), pos('gfx-des',67)],
-    email:'yuki.tanaka@daznproduction.com.au', phone:'0419 553 087' },
-  { id:'s17', name:'Leo Marchetti',    dept:'gfx',   contract:30, employment:'freelance',
-    positions:[pos('viz',66)],
-    email:'leo.marchetti@proton.me', phone:'0447 210 936' },
-  { id:'s29', name:'Dana Whitlock',    dept:'gfx',   contract:38, employment:'fulltime',
-    positions:[pos('viz',59)],
-    email:'dana.whitlock@daznproduction.com.au', phone:'0422 640 118' },
-
-  { id:'s30', name:'Callum Reid',      dept:'light', contract:38, employment:'fulltime',
+  { id:'s38', name:'Stuart Runyard', dept:'light', contract:38, employment:'freelance',
     positions:[pos('light-dir',74)],
-    email:'callum.reid@daznproduction.com.au', phone:'0403 518 772' },
-  { id:'s31', name:'Priyanka Bose',    dept:'light', contract:24, employment:'freelance',
-    positions:[pos('light-dir',79)],
-    email:'priyanka.bose@gmail.com', phone:'0439 226 401' },
-
-  { id:'s32', name:'Marisol Vega',     dept:'pres',  contract:38, employment:'fulltime',
-    positions:[pos('makeup',55)],
-    email:'marisol.vega@daznproduction.com.au', phone:'0408 337 925' },
-  { id:'s33', name:'Tahlia Brooks',    dept:'pres',  contract:24, employment:'freelance',
-    positions:[pos('makeup',60), pos('wardrobe',58)],
-    email:'tahlia.brooks@icloud.com', phone:'0450 883 719' },
-  { id:'s36', name:'Nina Kaur',        dept:'pres',  contract:38, employment:'fulltime',
-    positions:[pos('makeup',55)],
-    email:'nina.kaur@daznproduction.com.au', phone:'0437 092 614' },
-  { id:'s37', name:'Hamish Doyle',     dept:'light', contract:38, employment:'fulltime',
+    payrollId:'810246', manager:'Boogaerdt, Greg' },
+  { id:'s39', name:'Stu Anderson', dept:'light', contract:38, employment:'freelance',
     positions:[pos('light-dir',74)],
-    email:'hamish.doyle@daznproduction.com.au', phone:'0428 445 190' },
-  { id:'s34', name:'Georgia Sinclair', dept:'pres',  contract:38, employment:'fulltime',
+    payrollId:'007226', manager:'Boogaerdt, Greg' },
+  { id:'s40', name:'Mark Ulbricht', dept:'light', contract:38, employment:'freelance',
+    positions:[pos('light-op',62)],
+    payrollId:'007550', manager:'Boogaerdt, Greg' },
+  { id:'s41', name:'Paul Wootten', dept:'light', contract:38, employment:'freelance',
+    positions:[pos('light-dir',74)],
+    payrollId:'005902', manager:'Boogaerdt, Greg' },
+  { id:'s42', name:'Josh Trenfield', dept:'light', contract:38, employment:'freelance',
+    positions:[pos('light-dir',74)],
+    payrollId:'007549', manager:'Boogaerdt, Greg' },
+  { id:'s43', name:'Mitchell Wisby', dept:'light', contract:38, employment:'freelance',
+    positions:[pos('light-dir',74)],
+    payrollId:'78282', manager:'Boogaerdt, Greg' },
+  { id:'s44', name:'Michael John Burton', dept:'light', contract:38, employment:'freelance',
+    positions:[pos('light-dir',74)],
+    payrollId:'68098', manager:'Boogaerdt, Greg' },
+  { id:'s45', name:'Nic Versluis', dept:'light', contract:38, employment:'freelance',
+    positions:[pos('light-dir',74)],
+    payrollId:'006886', manager:'Boogaerdt, Greg' },
+  { id:'s46', name:'Lee Burling', dept:'light', contract:38, employment:'freelance',
+    positions:[pos('light-op',62)],
+    payrollId:'008953', manager:'Boogaerdt, Greg' },
+  { id:'s47', name:'Thomas Fuller', dept:'light', contract:38, employment:'freelance',
+    positions:[pos('light-dir',74)],
+    payrollId:'78281', manager:'Boogaerdt, Greg' },
+  { id:'s48', name:'Lucca Markham', dept:'light', contract:38, employment:'freelance',
+    positions:[pos('light-dir',74)],
+    payrollId:'812641', manager:'Boogaerdt, Greg' },
+  { id:'s49', name:'Jutarat Saejueng', dept:'stage', contract:38, employment:'freelance',
+    positions:[pos('stagehand',45)],
+    payrollId:'812325', manager:'Boogaerdt, Greg' },
+  { id:'s50', name:'Madeleine Furley', dept:'stage', contract:38, employment:'freelance',
+    positions:[pos('stagehand',45)],
+    payrollId:'811886', manager:'Boogaerdt, Greg' },
+  { id:'s51', name:'Dylan Richmond', dept:'stage', contract:38, employment:'freelance',
+    positions:[pos('stagehand',45)],
+    payrollId:'811912', manager:'Boogaerdt, Greg' },
+  { id:'s52', name:'Luke Van Der Meer', dept:'stage', contract:38, employment:'freelance',
+    positions:[pos('stagehand',45)],
+    payrollId:'008347', manager:'Boogaerdt, Greg' },
+  { id:'s53', name:'Charlie Phipps', dept:'stage', contract:38, employment:'freelance',
+    positions:[pos('stagehand',45)],
+    payrollId:'008002', manager:'Boogaerdt, Greg' },
+  { id:'s54', name:'Rodney Geeves', dept:'eng', contract:38, employment:'fulltime',
+    positions:[pos('bc-eng',79)],
+    payrollId:'006379', manager:'Cooley, Mat' },
+  { id:'s55', name:'Rachel MacInnes', dept:'prod', contract:38, employment:'fulltime',
+    positions:[pos('da',61), pos('viz',59)],
+    payrollId:'007116', manager:'Cooley, Mat' },
+  { id:'s56', name:'Lauren Phipps', dept:'prod', contract:38, employment:'fulltime',
+    positions:[pos('prod-mgr',95)],
+    payrollId:'000251', manager:'Howe, Derek' },
+  { id:'s57', name:'Miles Townend', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('edit-mgr',90)],
+    payrollId:'000145', manager:'Howe, Derek' },
+  { id:'s58', name:'Yasmin Orr', dept:'pres', contract:38, employment:'fulltime',
+    positions:[pos('makeup',55)],
+    payrollId:'006808', manager:'Howe, Derek' },
+  { id:'s59', name:'Andrew Robinson', dept:'cam', contract:38, employment:'fulltime',
+    positions:[pos('cam-sup',83)],
+    payrollId:'005070', manager:'Howe, Derek' },
+  { id:'s60', name:'Paris Farina', dept:'pres', contract:38, employment:'fulltime',
     positions:[pos('wardrobe',55)],
-    email:'georgia.sinclair@daznproduction.com.au', phone:'0411 704 268' },
-
-  { id:'s18', name:'Farid Haque',      dept:'eng',   contract:38, employment:'fulltime',
-    positions:[pos('tech-dir',86), pos('bc-eng',79), pos('net-eng',82)],
-    email:'farid.haque@daznproduction.com.au', phone:'0400 926 145' },
-  { id:'s19', name:'Bec Whitmore',     dept:'eng',   contract:38, employment:'fulltime',
-    positions:[pos('tech-dir',86), pos('bc-eng',79)],
-    email:'bec.whitmore@daznproduction.com.au', phone:'0451 287 604' },
-  { id:'s35', name:'Ivan Petrovic',    dept:'eng',   contract:38, employment:'fulltime',
-    positions:[pos('tech-dir',86), pos('bc-eng',79)],
-    email:'ivan.petrovic@daznproduction.com.au', phone:'0424 175 830' },
+    payrollId:'810188', manager:'Howe, Derek' },
+  { id:'s61', name:'Simon Shipley', dept:'aud', contract:38, employment:'fulltime',
+    positions:[pos('aud-dir',66)],
+    payrollId:'70527', manager:'Howe, Derek' },
+  { id:'s62', name:'Courtney Gantevoort', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('wardrobe',55)],
+    payrollId:'009142', manager:'Howe, Derek' },
+  { id:'s63', name:'John Nichols', dept:'aud', contract:38, employment:'fulltime',
+    positions:[pos('aud-dir',66)],
+    payrollId:'009162', manager:'Shipley, Simon' },
+  { id:'s64', name:'Ryan Hodkinson', dept:'aud', contract:38, employment:'fulltime',
+    positions:[pos('aud-dir',66)],
+    payrollId:'812492', manager:'Shipley, Simon' },
+  { id:'s65', name:'Craig Unwin', dept:'aud', contract:38, employment:'freelance',
+    positions:[pos('aud-dir',66)],
+    payrollId:'008061', manager:'Shipley, Simon' },
+  { id:'s66', name:'Mark Gluhak', dept:'aud', contract:38, employment:'freelance',
+    positions:[pos('aud-dir',66)],
+    payrollId:'009019', manager:'Shipley, Simon' },
+  { id:'s67', name:'Serge Stanley', dept:'aud', contract:38, employment:'freelance',
+    positions:[pos('aud-dir',66)],
+    payrollId:'006250', manager:'Shipley, Simon' },
+  { id:'s68', name:'Dave Hunter', dept:'aud', contract:38, employment:'freelance',
+    positions:[pos('aud-dir',66)],
+    payrollId:'70246', manager:'Shipley, Simon' },
+  { id:'s69', name:'Rebecca Wilson', dept:'pres', contract:38, employment:'fulltime',
+    positions:[pos('wardrobe',55)],
+    payrollId:'810296', manager:'Farina, Paris' },
+  { id:'s70', name:'Melissa Byrne', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('wardrobe',55)],
+    payrollId:'812639', manager:'Farina, Paris' },
+  { id:'s71', name:'Chloe Dutton', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('wardrobe',55)],
+    payrollId:'810890', manager:'Farina, Paris' },
+  { id:'s72', name:'Samantha Perkins', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('wardrobe',55)],
+    payrollId:'811662', manager:'Farina, Paris' },
+  { id:'s73', name:'Dannielle Maryanne Cartisano', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('wardrobe',55)],
+    payrollId:'812655', manager:'Farina, Paris' },
+  { id:'s74', name:'Tia Stillone', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('wardrobe',55)],
+    payrollId:'008269', manager:'Farina, Paris' },
+  { id:'s75', name:'Emily Abbey', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('wardrobe',55)],
+    payrollId:'812789', manager:'Farina, Paris' },
+  { id:'s76', name:'Abbey McCallum', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('wardrobe',55)],
+    payrollId:'812654', manager:'Farina, Paris' },
+  { id:'s77', name:'Matisse Hoai Thuong Coletran', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('wardrobe',55)],
+    payrollId:'810967', manager:'Farina, Paris' },
+  { id:'s78', name:'Joshua (Josh) Flinn', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('wardrobe',55)],
+    payrollId:'70677', manager:'Farina, Paris' },
+  { id:'s79', name:'Christina Validakis', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('wardrobe',55)],
+    payrollId:'006927', manager:'Farina, Paris' },
+  { id:'s80', name:'Maz (Marianne) Forbes', dept:'aud', contract:38, employment:'freelance',
+    positions:[pos('aud-asst',58)],
+    payrollId:'008322', manager:'Koveos, Antony' },
+  { id:'s81', name:'Talie Shamir', dept:'aud', contract:38, employment:'freelance',
+    positions:[pos('aud-asst',58)],
+    payrollId:'007215', manager:'Koveos, Antony' },
+  { id:'s82', name:'Claire Rohde', dept:'aud', contract:38, employment:'freelance',
+    positions:[pos('aud-asst',58)],
+    payrollId:'811471', manager:'Koveos, Antony' },
+  { id:'s83', name:'Olivia Irvine', dept:'aud', contract:38, employment:'freelance',
+    positions:[pos('aud-asst',58)],
+    payrollId:'811984', manager:'Koveos, Antony' },
+  { id:'s84', name:'Madeline Abbott', dept:'aud', contract:38, employment:'freelance',
+    positions:[pos('aud-asst',58)],
+    payrollId:'812660', manager:'Koveos, Antony' },
+  { id:'s85', name:'Daniel Tahana Ese', dept:'aud', contract:38, employment:'freelance',
+    positions:[pos('aud-asst',58)],
+    payrollId:'810203', manager:'Koveos, Antony' },
+  { id:'s86', name:'Karon Messina', dept:'aud', contract:38, employment:'freelance',
+    positions:[pos('aud-asst',58)],
+    payrollId:'007633', manager:'Koveos, Antony' },
+  { id:'s87', name:'Mick Tague', dept:'aud', contract:38, employment:'freelance',
+    positions:[pos('aud-asst',58)],
+    payrollId:'008336', manager:'Koveos, Antony' },
+  { id:'s88', name:'Sam Pitman', dept:'aud', contract:38, employment:'freelance',
+    positions:[pos('aud-asst',58), pos('aud-dir',66)],
+    payrollId:'009109', manager:'Koveos, Antony' },
+  { id:'s89', name:'Mark Tippett', dept:'aud', contract:38, employment:'fulltime',
+    positions:[pos('aud-dir',66)],
+    payrollId:'000576', manager:'Koveos, Antony' },
+  { id:'s90', name:'Casey McAlary', dept:'aud', contract:38, employment:'fulltime',
+    positions:[pos('aud-dir',66)],
+    payrollId:'008771', manager:'Koveos, Antony' },
+  { id:'s91', name:'Benjamin Luscombe', dept:'aud', contract:38, employment:'freelance',
+    positions:[pos('aud-dir',66)],
+    payrollId:'812282', manager:'Koveos, Antony' },
+  { id:'s92', name:'Matt Simpson', dept:'aud', contract:38, employment:'fulltime',
+    positions:[pos('aud-dir',66)],
+    payrollId:'006796', manager:'Koveos, Antony' },
+  { id:'s93', name:'Jonathon Skinner', dept:'eng', contract:38, employment:'fulltime',
+    positions:[pos('bc-eng',79)],
+    payrollId:'006352', manager:'Koveos, Antony' },
+  { id:'s94', name:'Matt Whalen', dept:'eng', contract:38, employment:'fulltime',
+    positions:[pos('tech-dir',86)],
+    payrollId:'007074', manager:'Koveos, Antony' },
+  { id:'s95', name:'Andrew Turner', dept:'eng', contract:38, employment:'freelance',
+    positions:[pos('tech-dir',86)],
+    payrollId:'704567', manager:'Koveos, Antony' },
+  { id:'s96', name:'Kean Miles', dept:'eng', contract:38, employment:'fulltime',
+    positions:[pos('tech-dir',86)],
+    payrollId:'811017', manager:'Koveos, Antony' },
+  { id:'s97', name:'Graeme Burke', dept:'eng', contract:38, employment:'freelance',
+    positions:[pos('tech-dir',86)],
+    payrollId:'60698', manager:'Koveos, Antony' },
+  { id:'s98', name:'Susan Fiori', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('da',61)],
+    payrollId:'008943', manager:'MacInnes, Rachel' },
+  { id:'s99', name:'Gabrielle (Gaby) Davies', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('da',61)],
+    payrollId:'005111', manager:'MacInnes, Rachel' },
+  { id:'s100', name:'Angela Rae', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('da',61)],
+    payrollId:'000095', manager:'MacInnes, Rachel' },
+  { id:'s101', name:'Justine Nay-Potter', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('da',61)],
+    payrollId:'005446', manager:'MacInnes, Rachel' },
+  { id:'s102', name:'Mel Macdonald', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('da',61)],
+    payrollId:'006874', manager:'MacInnes, Rachel' },
+  { id:'s103', name:'Claire Dwight', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('da',61)],
+    payrollId:'008095', manager:'MacInnes, Rachel' },
+  { id:'s104', name:'Elke Paynter', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('da',61)],
+    payrollId:'008781', manager:'MacInnes, Rachel' },
+  { id:'s105', name:'Adriana Nasato', dept:'prod', contract:24, employment:'fulltime',
+    positions:[pos('da',61), pos('viz',59)],
+    payrollId:'005815', manager:'MacInnes, Rachel' },
+  { id:'s106', name:'Sharni Pitman', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('da',61), pos('viz',59)],
+    payrollId:'810965', manager:'MacInnes, Rachel' },
+  { id:'s107', name:'Kylie Warner', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('da',61), pos('viz',59)],
+    payrollId:'812167', manager:'MacInnes, Rachel' },
+  { id:'s108', name:'Pip Hanrahan', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('da',61)],
+    payrollId:'008153', manager:'MacInnes, Rachel' },
+  { id:'s109', name:'Melinda Tran', dept:'gfx', contract:38, employment:'freelance',
+    positions:[pos('viz',59)],
+    payrollId:'810686', manager:'MacInnes, Rachel' },
+  { id:'s110', name:'Jessica Fenton', dept:'gfx', contract:38, employment:'freelance',
+    positions:[pos('viz',59), pos('da',61)],
+    payrollId:'008349', manager:'MacInnes, Rachel' },
+  { id:'s111', name:'Suzy Johnson (Reed)', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('prod-asst',55)],
+    payrollId:'006639', manager:'MacInnes, Rachel' },
+  { id:'s112', name:'Hana Staude', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('prod-asst',55)],
+    payrollId:'006121', manager:'MacInnes, Rachel' },
+  { id:'s113', name:'Hannah Bandi', dept:'gfx', contract:38, employment:'fulltime',
+    positions:[pos('gfx-des',67)],
+    payrollId:'006698', manager:'MacInnes, Rachel' },
+  { id:'s114', name:'Melanie Ayers', dept:'gfx', contract:38, employment:'freelance',
+    positions:[pos('viz',59)],
+    payrollId:'812840', manager:'MacInnes, Rachel' },
+  { id:'s115', name:'Mary Papaleonidas', dept:'pres', contract:38, employment:'fulltime',
+    positions:[pos('makeup',55)],
+    payrollId:'812538', manager:'Orr, Yasmin' },
+  { id:'s116', name:'Bonnie Charles', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'005871', manager:'Orr, Yasmin' },
+  { id:'s117', name:'Victoria Hayes', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'75306', manager:'Orr, Yasmin' },
+  { id:'s118', name:'Jennifer Carlson', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'60192', manager:'Orr, Yasmin' },
+  { id:'s119', name:'Amanda Jane Zacharewicz', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'811965', manager:'Orr, Yasmin' },
+  { id:'s120', name:'Cassandra Azar', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'811785', manager:'Orr, Yasmin' },
+  { id:'s121', name:'Sabrina Domenis', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'006938', manager:'Orr, Yasmin' },
+  { id:'s122', name:'Maryanne Aloisi', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'006726', manager:'Orr, Yasmin' },
+  { id:'s123', name:'Kim Anderson', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'77424', manager:'Orr, Yasmin' },
+  { id:'s124', name:'Annie Ross', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'812814', manager:'Orr, Yasmin' },
+  { id:'s125', name:'Sumitra joshi Shrestha', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'812846', manager:'Orr, Yasmin' },
+  { id:'s126', name:'Ramsina Yousif', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'811968', manager:'Orr, Yasmin' },
+  { id:'s127', name:'Emma Moore', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'007572', manager:'Orr, Yasmin' },
+  { id:'s128', name:'Elle Van Niekerk', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'007577', manager:'Orr, Yasmin' },
+  { id:'s129', name:'Mandy Perkins', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'005036', manager:'Orr, Yasmin' },
+  { id:'s130', name:'Kirsty Bremner', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'810320', manager:'Orr, Yasmin' },
+  { id:'s131', name:'Ann-Marie Hankinson', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'8580', manager:'Orr, Yasmin' },
+  { id:'s132', name:'Amanda Barnard', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'008451', manager:'Orr, Yasmin' },
+  { id:'s133', name:'Victoria Rene St John', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'811100', manager:'Orr, Yasmin' },
+  { id:'s134', name:'Joanne (Jo) Smith', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'812340', manager:'Orr, Yasmin' },
+  { id:'s135', name:'Laura Johnstone', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'009048', manager:'Orr, Yasmin' },
+  { id:'s136', name:'Zoe Tranter', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'812364', manager:'Orr, Yasmin' },
+  { id:'s137', name:'Jessica Marshall', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'008658', manager:'Orr, Yasmin' },
+  { id:'s138', name:'Monica Borromeo', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'812215', manager:'Orr, Yasmin' },
+  { id:'s139', name:'Marianna Grillo', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'005051', manager:'Orr, Yasmin' },
+  { id:'s140', name:'Sara Morrison', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'811966', manager:'Orr, Yasmin' },
+  { id:'s141', name:'Cameron Smith', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'008051', manager:'Orr, Yasmin' },
+  { id:'s142', name:'Kristy Ferrari', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'008080', manager:'Orr, Yasmin' },
+  { id:'s143', name:'Margaret Aston', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'008064', manager:'Orr, Yasmin' },
+  { id:'s144', name:'Nicola Burford', dept:'pres', contract:38, employment:'freelance',
+    positions:[pos('makeup',55)],
+    payrollId:'007596', manager:'Orr, Yasmin' },
+  { id:'s145', name:'James Zappia', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('dir',112)],
+    payrollId:'007316', manager:'Patterson, Christopher' },
+  { id:'s146', name:'Brady Eavis', dept:'vis', contract:38, employment:'fulltime',
+    positions:[pos('switcher',79)],
+    payrollId:'812574', manager:'Patterson, Christopher' },
+  { id:'s147', name:'Nathan Steele', dept:'vis', contract:38, employment:'freelance',
+    positions:[pos('switcher',79)],
+    payrollId:'008922', manager:'Patterson, Christopher' },
+  { id:'s148', name:'Jenny Snell', dept:'vis', contract:38, employment:'freelance',
+    positions:[pos('switcher',79)],
+    payrollId:'005715', manager:'Patterson, Christopher' },
+  { id:'s149', name:'Richard Goffin', dept:'vis', contract:38, employment:'freelance',
+    positions:[pos('switcher',79)],
+    payrollId:'61692', manager:'Patterson, Christopher' },
+  { id:'s150', name:'Thomas (Tom) Luck', dept:'evs', contract:38, employment:'freelance',
+    positions:[pos('evs',65)],
+    payrollId:'812681', manager:'Phelan, James' },
+  { id:'s151', name:'Katrina Beesley (Arnold)', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('da',61)],
+    payrollId:'005860', manager:'Phipps, Lauren' },
+  { id:'s152', name:'Joshua Smith', dept:'evs', contract:38, employment:'fulltime',
+    positions:[pos('evs',65)],
+    payrollId:'812115', manager:'Phipps, Lauren' },
+  { id:'s153', name:'John Paul Bacoy', dept:'evs', contract:38, employment:'fulltime',
+    positions:[pos('evs',65)],
+    payrollId:'008223', manager:'Phipps, Lauren' },
+  { id:'s154', name:'James Phelan', dept:'evs', contract:38, employment:'fulltime',
+    positions:[pos('evs',65)],
+    payrollId:'006496', manager:'Phipps, Lauren' },
+  { id:'s155', name:'Timothy Peyton', dept:'evs', contract:38, employment:'fulltime',
+    positions:[pos('evs',65)],
+    payrollId:'005897', manager:'Phipps, Lauren' },
+  { id:'s156', name:'Drew Donikian', dept:'evs', contract:38, employment:'freelance',
+    positions:[pos('evs',65)],
+    payrollId:'005776', manager:'Phipps, Lauren' },
+  { id:'s157', name:'Greg Boogaerdt', dept:'stage', contract:38, employment:'fulltime',
+    positions:[pos('staging-mgr',60)],
+    payrollId:'006130', manager:'Phipps, Lauren' },
+  { id:'s158', name:'Maximilian Zschach', dept:'stage', contract:38, employment:'fulltime',
+    positions:[pos('stagehand',45)],
+    payrollId:'812523', manager:'Phipps, Lauren' },
+  { id:'s159', name:'Christopher (Chris) Patterson', dept:'vis', contract:38, employment:'fulltime',
+    positions:[pos('vis-sup',89)],
+    payrollId:'007237', manager:'Phipps, Lauren' },
+  { id:'s160', name:'Elisha Selwood', dept:'prod', contract:38, employment:'fulltime',
+    positions:[pos('prod-asst',55)],
+    payrollId:'006036', manager:'Phipps, Lauren' },
+  { id:'s161', name:'Angus McPherson', dept:'cam', contract:38, employment:'fulltime',
+    positions:[pos('cam',62)],
+    payrollId:'006147', manager:'Robinson, Andrew' },
+  { id:'s162', name:'Malcolm Bone', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'008527', manager:'Robinson, Andrew' },
+  { id:'s163', name:'David Sliwinski', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'000388', manager:'Robinson, Andrew' },
+  { id:'s164', name:'Lawrence Chinchilla', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'008850', manager:'Robinson, Andrew' },
+  { id:'s165', name:'Hayley Wallace', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'812052', manager:'Robinson, Andrew' },
+  { id:'s166', name:'Engin Karadeniz', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'008307', manager:'Robinson, Andrew' },
+  { id:'s167', name:'Andrew Anicic', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'007014', manager:'Robinson, Andrew' },
+  { id:'s168', name:'Adam Phillips', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'005109', manager:'Robinson, Andrew' },
+  { id:'s169', name:'Steven Fisher', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'005683', manager:'Robinson, Andrew' },
+  { id:'s170', name:'Aaran Creece', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'7044', manager:'Robinson, Andrew' },
+  { id:'s171', name:'Noel MacDonald', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'007537', manager:'Robinson, Andrew' },
+  { id:'s172', name:'Matthew Richards', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'008640', manager:'Robinson, Andrew' },
+  { id:'s173', name:'Ben Porteous', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'006733', manager:'Robinson, Andrew' },
+  { id:'s174', name:'Riley Cope', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'006936', manager:'Robinson, Andrew' },
+  { id:'s175', name:'David Phipps', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'005817', manager:'Robinson, Andrew' },
+  { id:'s176', name:'Andrew Israel', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'006706', manager:'Robinson, Andrew' },
+  { id:'s177', name:'Gary Gare', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'005895', manager:'Robinson, Andrew' },
+  { id:'s178', name:'Dennis Livingston', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'006836', manager:'Robinson, Andrew' },
+  { id:'s179', name:'Terry Collister', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'005508', manager:'Robinson, Andrew' },
+  { id:'s180', name:'Mark Fielder-Gill', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'006337', manager:'Robinson, Andrew' },
+  { id:'s181', name:'Ben Purvey', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'008253', manager:'Robinson, Andrew' },
+  { id:'s182', name:'Ryan Windsor', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'811908', manager:'Robinson, Andrew' },
+  { id:'s183', name:'Jonathan (Jono) Hilly', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'008350', manager:'Robinson, Andrew' },
+  { id:'s184', name:'Matthew McGaughey', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'810213', manager:'Robinson, Andrew' },
+  { id:'s185', name:'Danny Morris', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'006600', manager:'Robinson, Andrew' },
+  { id:'s186', name:'Connor Lucas', dept:'cam', contract:38, employment:'fulltime',
+    positions:[pos('cam',62)],
+    payrollId:'810822', manager:'Robinson, Andrew' },
+  { id:'s187', name:'Jono Shtein', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('cam',62)],
+    payrollId:'812048', manager:'Robinson, Andrew' },
+  { id:'s188', name:'Ken Horton', dept:'prod', contract:24, employment:'fulltime',
+    positions:[pos('fm',67)],
+    payrollId:'005773', manager:'Robinson, Andrew' },
+  { id:'s189', name:'Tony O\'Connor', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('fm',67)],
+    payrollId:'005057', manager:'Robinson, Andrew' },
+  { id:'s190', name:'Jade Bentley', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('fm',67)],
+    payrollId:'008271', manager:'Robinson, Andrew' },
+  { id:'s191', name:'Dorian Newstead', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('fm',67)],
+    payrollId:'005012', manager:'Robinson, Andrew' },
+  { id:'s192', name:'Zach Rawson', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('fm',67)],
+    payrollId:'008824', manager:'Robinson, Andrew' },
+  { id:'s193', name:'Sandra (Lee) Page', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('fm',67)],
+    payrollId:'810223', manager:'Robinson, Andrew' },
+  { id:'s194', name:'Anja Green', dept:'prod', contract:38, employment:'freelance',
+    positions:[pos('fm',67)],
+    payrollId:'812950', manager:'Robinson, Andrew' },
+  { id:'s195', name:'Alex Morrison', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('jib',68)],
+    payrollId:'006700', manager:'Robinson, Andrew' },
+  { id:'s196', name:'Ross Parry', dept:'cam', contract:24, employment:'fulltime',
+    positions:[pos('jib',68)],
+    payrollId:'009273', manager:'Robinson, Andrew' },
+  { id:'s197', name:'Andrew Midlam', dept:'cam', contract:24, employment:'fulltime',
+    positions:[pos('sted',68)],
+    payrollId:'007167', manager:'Robinson, Andrew' },
+  { id:'s198', name:'Christopher (Chris) McHardy', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('sted',68)],
+    payrollId:'712382', manager:'Robinson, Andrew' },
+  { id:'s199', name:'Robert Boyd', dept:'cam', contract:38, employment:'freelance',
+    positions:[pos('sted',68)],
+    payrollId:'008115', manager:'Robinson, Andrew' },
+  { id:'s200', name:'Hamish Wicks', dept:'edit', contract:38, employment:'freelance',
+    positions:[pos('editor',60)],
+    payrollId:'812782', manager:'Allen, Damien' },
+  { id:'s201', name:'Damien Allen', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('edit-sup',72)],
+    payrollId:'006138', manager:'Townend, Miles' },
+  { id:'s202', name:'Rachael Gaunt', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('editor',60)],
+    payrollId:'810198', manager:'Townend, Miles' },
+  { id:'s203', name:'Addison Hamilton', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('editor',60)],
+    payrollId:'007647', manager:'Townend, Miles' },
+  { id:'s204', name:'Duncan Taylor', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('editor',60)],
+    payrollId:'005727', manager:'Townend, Miles' },
+  { id:'s205', name:'Chris Solling', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('edit-sup',72)],
+    payrollId:'006234', manager:'Townend, Miles' },
+  { id:'s206', name:'Stephanie McArthur', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('editor',60)],
+    payrollId:'812062', manager:'Townend, Miles' },
+  { id:'s207', name:'Andrew Gallie', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('editor',60)],
+    payrollId:'000147', manager:'Townend, Miles' },
+  { id:'s208', name:'Luke McKay', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('editor',60)],
+    payrollId:'007092', manager:'Townend, Miles' },
+  { id:'s209', name:'Heath Pringle', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('editor',60)],
+    payrollId:'008184', manager:'Townend, Miles' },
+  { id:'s210', name:'Olivia McDonald', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('editor',60)],
+    payrollId:'812482', manager:'Townend, Miles' },
+  { id:'s211', name:'Harrison Revai', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('editor',60)],
+    payrollId:'812561', manager:'Townend, Miles' },
+  { id:'s212', name:'Mandy Stewart', dept:'edit', contract:38, employment:'freelance',
+    positions:[pos('editor',60)],
+    payrollId:'006331', manager:'Townend, Miles' },
+  { id:'s213', name:'Nathan Roach', dept:'edit', contract:38, employment:'freelance',
+    positions:[pos('editor',60)],
+    payrollId:'810968', manager:'Townend, Miles' },
+  { id:'s214', name:'Tobias Jay Wood', dept:'edit', contract:38, employment:'freelance',
+    positions:[pos('editor',60)],
+    payrollId:'810886', manager:'Townend, Miles' },
+  { id:'s215', name:'Anthony Langford', dept:'edit', contract:38, employment:'freelance',
+    positions:[pos('editor',60)],
+    payrollId:'5006', manager:'Townend, Miles' },
+  { id:'s216', name:'Michael Mason', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('editor',60)],
+    payrollId:'006292', manager:'Townend, Miles' },
+  { id:'s217', name:'Mark Radovic', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('edit-sup',72)],
+    payrollId:'20147', manager:'Townend, Miles' },
+  { id:'s218', name:'Wim van Veldhuisen', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('editor',60)],
+    payrollId:'006258', manager:'Townend, Miles' },
+  { id:'s219', name:'Jared Saunders', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('editor',60)],
+    payrollId:'009055', manager:'Townend, Miles' },
+  { id:'s220', name:'Ian Stanley', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('editor',60)],
+    payrollId:'20098', manager:'Townend, Miles' },
+  { id:'s221', name:'Daniel (Dan) Niciforovic', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('editor',60)],
+    payrollId:'008499', manager:'Townend, Miles' },
+  { id:'s222', name:'Sam Fletcher', dept:'edit', contract:38, employment:'fulltime',
+    positions:[pos('editor',60)],
+    payrollId:'005178', manager:'Townend, Miles' },
+  { id:'s223', name:'Jim Marsden', dept:'edit', contract:38, employment:'freelance',
+    positions:[pos('editor',60)],
+    payrollId:'008856', manager:'Townend, Miles' },
 ];
 
-let STAFF_SEQ = 37;
+let STAFF_SEQ = 223;
 const newStaffId = ()=> 's'+String(++STAFF_SEQ).padStart(2,'0');
 
 
@@ -1779,9 +2241,17 @@ const $  = (s,r=document)=>r.querySelector(s);
 const $$ = (s,r=document)=>[...r.querySelectorAll(s)];
 const byId = (a,id)=>a.find(x=>x.id===id);
 const facility = id=>byId(FACILITIES,id);
-const dept = id=>byId(DEPARTMENTS,id);
-const role = id=>byId(ROLES,id);
-const person = id=>byId(STAFF,id);
+/* Fallbacks for dept/role/person: a shift or day-off can outlive the
+   crew member or position it names (a staff import that replaces the
+   roster, a role retired from ROLES) — every caller already treats
+   "no staffId" as an open slot, so a dangling id should read the same
+   way instead of throwing mid-render. */
+const UNKNOWN_DEPT = { id:'', name:'Unknown dept' };
+const UNKNOWN_ROLE = { id:'', dept:'', name:'Unknown role' };
+const UNKNOWN_PERSON = { id:'', name:'Former crew member', initials:'?', dept:'', contract:0, employment:'freelance', positions:[], email:'', phone:'' };
+const dept = id=>byId(DEPARTMENTS,id) || UNKNOWN_DEPT;
+const role = id=>byId(ROLES,id) || UNKNOWN_ROLE;
+const person = id=>byId(STAFF,id) || UNKNOWN_PERSON;
 const hasRole = (p, roleId)=> !!p && p.positions.some(x=>x.roleId===roleId);
 const rateFor = (p, roleId)=> { const x = p && p.positions.find(x=>x.roleId===roleId); return x ? x.rate : null; };
 const booking = id=>byId(BOOKINGS,id);
@@ -2206,6 +2676,9 @@ const state = {
   tokens:[],              // the filter pills sitting in the search field
   crewDeptFilter:'all',
   crewEmpFilter:'all',
+  crewRoleFilter:'all',
+  crewOverOnly:false,
+  laneMode:'half',       // 'fac' | 'half' | 'crew' — which of the two workspace panes show
 };
 
 /* ============================================================
@@ -3655,6 +4128,8 @@ function crewListFiltered(){
   return STAFF.filter(p=>{
     if (state.crewDeptFilter!=='all' && p.dept!==state.crewDeptFilter) return false;
     if (state.crewEmpFilter!=='all' && p.employment!==state.crewEmpFilter) return false;
+    if (state.crewRoleFilter!=='all' && !p.positions.some(x=>x.roleId===state.crewRoleFilter)) return false;
+    if (state.crewOverOnly && weekHours(p.id, state.weekStart) <= p.contract) return false;
     return !q || p.name.toLowerCase().includes(q);
   });
 }
@@ -3669,11 +4144,13 @@ function renderCrewList(){
       <label class="search"><svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="6.2" cy="6.2" r="4.2" stroke="currentColor" stroke-width="1.4"/><path d="m9.4 9.4 3 3" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
         <input id="crewSearchInput" type="search" placeholder="Find crew" value="${esc(state.crewSearch)}" aria-label="Find crew"></label>
       <select class="select" id="crewDeptSelect"><option value="all">All departments</option>${DEPARTMENTS.map(d=>`<option value="${d.id}" ${d.id===state.crewDeptFilter?'selected':''}>${d.name}</option>`).join('')}</select>
+      <select class="select" id="crewRoleSelect"><option value="all">All positions</option>${ROLES.map(r=>`<option value="${r.id}" ${r.id===state.crewRoleFilter?'selected':''}>${r.name}</option>`).join('')}</select>
       <select class="select" id="crewEmpSelect">
         <option value="all" ${state.crewEmpFilter==='all'?'selected':''}>All employment types</option>
         <option value="fulltime" ${state.crewEmpFilter==='fulltime'?'selected':''}>Full-time</option>
         <option value="freelance" ${state.crewEmpFilter==='freelance'?'selected':''}>Freelance</option>
       </select>
+      <label class="chk"><input type="checkbox" id="crewOverChk" ${state.crewOverOnly?'checked':''}> Over hours only</label>
       <span class="crewToolbar__right"><button class="btn btn--primary btn--sm" id="newCrewBtn">${svgPlus} Add crew member</button></span>
     </div>
 
@@ -3682,7 +4159,7 @@ function renderCrewList(){
       <div class="statCard"><div class="statCard__n">${stats.fulltime}</div><div class="statCard__l">Full-time</div></div>
       <div class="statCard"><div class="statCard__n">${stats.freelance}</div><div class="statCard__l">Freelance</div></div>
       <div class="statCard"><div class="statCard__n">${Math.round(stats.totalWeekHrs)}h</div><div class="statCard__l">Rostered this week</div></div>
-      <div class="statCard"><div class="statCard__n ${stats.overCount?'is-warn':''}">${stats.overCount}</div><div class="statCard__l">Over contracted hours</div></div>
+      <button class="statCard statCard--btn" id="crewOverStat" aria-pressed="${state.crewOverOnly}"><div class="statCard__n ${stats.overCount?'is-warn':''}">${stats.overCount}</div><div class="statCard__l">Over contracted hours</div></button>
     </div>
 
     <div class="crewLayout">
@@ -3695,7 +4172,10 @@ function renderCrewList(){
   $('#newCrewBtn').onclick = newStaffDraft;
   $('#crewSearchInput').oninput = e=>{ state.crewSearch = e.target.value; renderCrewRows(); };
   $('#crewDeptSelect').onchange = e=>{ state.crewDeptFilter = e.target.value; renderCrewRows(); };
+  $('#crewRoleSelect').onchange = e=>{ state.crewRoleFilter = e.target.value; renderCrewRows(); };
   $('#crewEmpSelect').onchange = e=>{ state.crewEmpFilter = e.target.value; renderCrewRows(); };
+  $('#crewOverChk').onchange = e=>{ state.crewOverOnly = e.target.checked; renderCrewList(); };
+  $('#crewOverStat').onclick = ()=>{ state.crewOverOnly = !state.crewOverOnly; renderCrewList(); };
   renderCrewRows();
 }
 
@@ -4525,6 +5005,19 @@ function setView(v){
   $('#viewMonth').setAttribute('aria-pressed', v==='month');
   $('#app').classList.toggle('is-month-view', v==='month');
   render();
+}
+
+$('#layoutFac').onclick  = ()=> setLayoutMode('fac');
+$('#layoutHalf').onclick = ()=> setLayoutMode('half');
+$('#layoutCrew').onclick = ()=> setLayoutMode('crew');
+function setLayoutMode(mode){
+  state.laneMode = mode;
+  $('#workspace').classList.toggle('mode-fac', mode==='fac');
+  $('#workspace').classList.toggle('mode-crew', mode==='crew');
+  $('#layoutFac').setAttribute('aria-pressed', mode==='fac');
+  $('#layoutHalf').setAttribute('aria-pressed', mode==='half');
+  $('#layoutCrew').setAttribute('aria-pressed', mode==='crew');
+  saveSession();
 }
 $('#densityBtn').onclick = ()=>{ state.compact=!state.compact; $('#app').classList.toggle('is-compact', state.compact); };
 $('#themeBtn').onclick = ()=>{ const r=document.documentElement; r.dataset.theme = r.dataset.theme==='dark'?'light':'dark'; };
@@ -5630,6 +6123,7 @@ function writeSession(){
       tokens: state.tokens, search: state.search,
       theme: document.documentElement.dataset.theme,
       topH: $('#workspace').style.getPropertyValue('--top-h'),
+      laneMode: state.laneMode,
       sel: state.sel && state.sel.id ? { kind:state.sel.kind, id:state.sel.id } : null,
       facScroll: $('#facScroll').scrollTop, crewScroll: $('#crewScroll').scrollTop,
       xScroll: $('#facScroll').scrollLeft,
@@ -5655,6 +6149,7 @@ function restoreSession(){
   ['week','day','month'].forEach(x=>
     $('#view'+x[0].toUpperCase()+x.slice(1)).setAttribute('aria-pressed', state.view===x));
   if (v.topH) $('#workspace').style.setProperty('--top-h', v.topH);
+  if (v.laneMode) setLayoutMode(v.laneMode);
   $('#search').value = state.search;
   renderTokens();
 
@@ -5687,8 +6182,8 @@ function restoreSession(){
    ============================================================ */
 function snapshotState(){
   return {
-    staff: STAFF, shows: SHOWS, bookings: BOOKINGS, shifts: SHIFTS,
-    seq: { STAFF_SEQ, SHOW_SEQ, POS_SEQ, BK_SEQ, SH_SEQ },
+    staff: STAFF, shows: SHOWS, bookings: BOOKINGS, shifts: SHIFTS, offdays: OFFDAYS,
+    seq: { STAFF_SEQ, SHOW_SEQ, POS_SEQ, BK_SEQ, SH_SEQ, OFF_SEQ },
   };
 }
 function applyState(data){
@@ -5696,12 +6191,14 @@ function applyState(data){
   if (Array.isArray(data.shows)) SHOWS = data.shows;
   if (Array.isArray(data.bookings)) BOOKINGS = data.bookings;
   if (Array.isArray(data.shifts)) SHIFTS = data.shifts;
+  if (Array.isArray(data.offdays)) OFFDAYS = data.offdays;
   const seq = data.seq || {};
   if (seq.STAFF_SEQ != null) STAFF_SEQ = seq.STAFF_SEQ;
   if (seq.SHOW_SEQ != null) SHOW_SEQ = seq.SHOW_SEQ;
   if (seq.POS_SEQ != null) POS_SEQ = seq.POS_SEQ;
   if (seq.BK_SEQ != null) BK_SEQ = seq.BK_SEQ;
   if (seq.SH_SEQ != null) SH_SEQ = seq.SH_SEQ;
+  if (seq.OFF_SEQ != null) OFF_SEQ = seq.OFF_SEQ;
 }
 
 let lastPersistedJson = null;
