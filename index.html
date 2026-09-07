@@ -717,6 +717,8 @@ body.is-resizing-any .wbar:not(.is-resizing){pointer-events:none}
 .field__value{font-size:var(--t-lg)}
 .field .select,.field input,.field textarea{width:100%;background:var(--surface-2);border:1px solid var(--line);
   border-radius:var(--radius);padding:0 10px;height:34px}
+.field__static{width:100%;background:var(--surface-2);border:1px solid var(--line-soft);color:var(--text-2);
+  border-radius:var(--radius);padding:0 10px;height:34px;display:flex;align-items:center;box-sizing:border-box}
 .field textarea{padding:8px 10px;height:auto;min-height:58px;resize:vertical}
 .field__2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .checklist{display:grid;gap:2px;max-height:174px;overflow:auto;border:1px solid var(--line);border-radius:var(--radius);padding:6px;background:var(--surface-2)}
@@ -4321,9 +4323,14 @@ function renderCrewDetail(){
               <button class="chip" data-emp="freelance" aria-pressed="${p.employment==='freelance'}">Freelance</button>
             </div></div>
           <div class="field__2">
-            <div class="field"><div class="field__label">Email</div><input type="text" id="cEmail" value="${esc(p.email)}" placeholder="name@example.com"></div>
-            <div class="field"><div class="field__label">Phone</div><input type="text" id="cPhone" value="${esc(p.phone)}" placeholder="04xx xxx xxx"></div>
+            <div class="field"><div class="field__label">Email</div><input type="text" id="cEmail" value="${esc(p.email||'')}" placeholder="name@example.com"></div>
+            <div class="field"><div class="field__label">Phone</div><input type="text" id="cPhone" value="${esc(p.phone||'')}" placeholder="04xx xxx xxx"></div>
           </div>
+          ${p.manager || p.payrollId ? `
+          <div class="field__2">
+            ${p.manager ? `<div class="field"><div class="field__label">Manager</div><div class="field__static">${esc(p.manager)}</div></div>` : '<div></div>'}
+            ${p.payrollId ? `<div class="field"><div class="field__label">Payroll ID</div><div class="field__static">${esc(p.payrollId)}</div></div>` : '<div></div>'}
+          </div>` : ''}
 
           ${isNew ? '' : hoursPanelHtml(p)}
 
